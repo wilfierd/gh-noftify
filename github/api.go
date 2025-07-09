@@ -181,8 +181,29 @@ func (c *Client) GetNotifications() ([]Notification, error) {
 	}
 	defer resp.Body.Close()
 
+	// Read the response body first
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Check for HTTP errors
+	if resp.StatusCode != http.StatusOK {
+		var errorResp struct {
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(body, &errorResp); err == nil {
+			// Handle specific permission errors
+			if resp.StatusCode == http.StatusForbidden && errorResp.Message == "Resource not accessible by personal access token" {
+				return nil, fmt.Errorf("GitHub token missing 'notifications' permission. Please regenerate token with proper permissions")
+			}
+			return nil, fmt.Errorf("GitHub API error: %s (status: %d)", errorResp.Message, resp.StatusCode)
+		}
+		return nil, fmt.Errorf("GitHub API error: status %d", resp.StatusCode)
+	}
+
 	var notifications []Notification
-	if err := json.NewDecoder(resp.Body).Decode(&notifications); err != nil {
+	if err := json.Unmarshal(body, &notifications); err != nil {
 		return nil, fmt.Errorf("failed to decode notifications: %w", err)
 	}
 

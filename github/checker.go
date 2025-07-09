@@ -56,7 +56,10 @@ func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
 	// Get unread notifications
 	notifications, err := c.GetNotifications()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get notifications: %w", err)
+		// Don't fail the whole check if notifications fail due to permissions
+		fmt.Printf("Warning: failed to get notifications: %v\n", err)
+		// Continue with empty notifications
+		notifications = []Notification{}
 	}
 
 	for _, notif := range notifications {

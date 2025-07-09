@@ -4,6 +4,14 @@ REM Chạy script này để test tool trước khi deploy
 
 echo 🧪 Testing GitHub Notifier...
 
+REM Check if test-env.bat exists and run it
+if exist test-env.bat (
+    echo 🔧 Loading environment from test-env.bat...
+    call test-env.bat
+) else (
+    echo ⚠️  test-env.bat not found, using existing environment variables
+)
+
 REM Kiểm tra Go version
 echo 📋 Checking Go version...
 go version
@@ -12,13 +20,13 @@ REM Kiểm tra environment variables
 echo 🔐 Checking environment variables...
 if "%GITHUB_TOKEN%"=="" (
     echo ❌ GITHUB_TOKEN is not set
-    echo Please set: set GITHUB_TOKEN=your_token_here
+    echo Please run: test-env.bat first or set manually
     exit /b 1
 )
 
 if "%DISCORD_WEBHOOK%"=="" (
     echo ❌ DISCORD_WEBHOOK is not set
-    echo Please set: set DISCORD_WEBHOOK=your_webhook_url
+    echo Please run: test-env.bat first or set manually
     exit /b 1
 )
 
