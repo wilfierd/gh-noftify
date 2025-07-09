@@ -10,9 +10,13 @@ import (
 	"github.com/gh-notify/config"
 	"github.com/gh-notify/github"
 	"github.com/gh-notify/notify"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file if exists (silent fail for production)
+	_ = godotenv.Load()
+
 	// Load configuration
 	cfg := config.Load()
 
