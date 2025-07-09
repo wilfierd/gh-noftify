@@ -1,18 +1,30 @@
 name: GitHub Notifier
 
+# on:
+#   schedule:
+#     # Mỗi 5 phút để check alerts
+#     - cron: '*/5 * * * *'
+#     # 9h sáng VN = 2h UTC cho daily report
+#     - cron: '0 2 * * *'
+#   workflow_dispatch:  # Cho phép chạy thủ công
+#     inputs:
+#       force_daily:
+#         description: 'Force daily report'
+#         required: false
+#         default: false
+#         type: boolean
 on:
-  schedule:
-    # Mỗi 5 phút để check alerts
-    - cron: '*/5 * * * *'
-    # 9h sáng VN = 2h UTC cho daily report
-    - cron: '0 2 * * *'
-  workflow_dispatch:  # Cho phép chạy thủ công
+  workflow_dispatch:  # Chỉ chạy manual
     inputs:
-      force_daily:
-        description: 'Force daily report'
-        required: false
-        default: false
-        type: boolean
+      check_type:
+        description: 'Type of check to run'
+        required: true
+        default: 'instant'
+        type: choice
+        options:
+        - instant
+        - daily
+        - both
 
 jobs:
   notify:

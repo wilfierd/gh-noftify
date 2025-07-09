@@ -23,10 +23,34 @@ Vào repository Settings → Secrets and variables → Actions, thêm:
 
 | Secret | Mô tả |
 |--------|-------|
-| `GITHUB_TOKEN` | Personal Access Token với quyền `notifications`, `repo`, `read:org` |
+| `GH_TOKEN` | Personal Access Token với quyền `notifications`, `repo`, `read:user` |
 | `DISCORD_WEBHOOK` | URL webhook Discord |
 
-### 4. Tùy chỉnh cấu hình (tùy chọn)
+**⚠️ Lưu ý:** Không sử dụng `GITHUB_TOKEN` (reserved), phải dùng `GH_TOKEN`
+
+### 4. Test locally (tùy chọn)
+
+**Windows:**
+```cmd
+# Setup environment
+setup.bat
+
+# Edit test-env.bat with your real values
+# Then run
+test.bat
+```
+
+**Linux/Mac:**
+```bash
+# Setup environment
+./setup.sh
+
+# Edit test-env.sh with your real values
+# Then run
+./test.sh
+```
+
+### 5. Tùy chỉnh cấu hình (tùy chọn)
 Chỉnh sửa file `.github/workflows/notify.yml`:
 
 ```yaml

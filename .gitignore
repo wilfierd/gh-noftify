@@ -41,6 +41,10 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Test environment files with real tokens
+test-env.bat
+test-env.sh
+
 # Temporary files
 tmp/
 temp/

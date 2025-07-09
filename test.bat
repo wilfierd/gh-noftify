@@ -9,7 +9,11 @@ if exist test-env.bat (
     echo 🔧 Loading environment from test-env.bat...
     call test-env.bat
 ) else (
-    echo ⚠️  test-env.bat not found, using existing environment variables
+    echo ⚠️  test-env.bat not found!
+    echo 📋 Please copy test-env.bat.template to test-env.bat and fill in your values
+    echo 💡 Run: copy test-env.bat.template test-env.bat
+    pause
+    exit /b 1
 )
 
 REM Kiểm tra Go version
