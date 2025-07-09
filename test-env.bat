@@ -8,7 +8,7 @@ REM GitHub Personal Access Token (replace with your actual token)
 set GITHUB_TOKEN=your_github_token_here
 
 REM Discord Webhook URL (replace with your actual webhook)
-set DISCORD_WEBHOOK=https://discord.com/api/webhooks/1392337776149790780/VqIyOXdhd5mpXMfjP58qzGAfKujMtc5LR4pHA_xI-xM9nk_okcduIkhfXOpK6gsSWtlG
+set DISCORD_WEBHOOK=
 
 REM GitHub Username (replace with your actual username)
 set GITHUB_USERNAME=wilfierd
