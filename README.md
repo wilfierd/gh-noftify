@@ -23,10 +23,9 @@ Vào repository Settings → Secrets and variables → Actions, thêm:
 
 | Secret | Mô tả |
 |--------|-------|
-| `GH_TOKEN` | Personal Access Token với quyền `notifications`, `repo`, `read:user` |
+| `GH_TOKEN` | Personal Access Token old school one với quyền `notifications`, `repo`, `read:user` |
 | `DISCORD_WEBHOOK` | URL webhook Discord |
 
-**⚠️ Lưu ý:** Không sử dụng `GITHUB_TOKEN` (reserved), phải dùng `GH_TOKEN`
 
 ### 4. Test locally (tùy chọn)
 
@@ -121,38 +120,9 @@ gh-notify/
     └── notify.yml         # GitHub Actions
 ```
 
-## 🔐 Bảo mật
-
-- Không commit secrets vào code
-- Sử dụng GitHub Secrets để lưu token
-- Cache state được commit tự động để tránh duplicate
-
-## 🐛 Troubleshooting
-
-### Lỗi Authentication
-```
-Error: failed to get user: 401 Unauthorized
-```
-→ Kiểm tra `GITHUB_TOKEN` có đúng và có quyền cần thiết
-
-### Lỗi Discord Webhook
-```
-Error: discord API error: 400 Bad Request
-```
-→ Kiểm tra `DISCORD_WEBHOOK` URL có đúng format
-
-### Không nhận được thông báo
-- Kiểm tra GitHub Actions logs
-- Đảm bảo workflow được enable
-- Kiểm tra timezone settings
-
-## 📝 License
-
-MIT License - xem file LICENSE để biết thêm chi tiết.
-
 ## 🤝 Contributing
 
-Pull requests are welcome! Vui lòng mở issue trước khi thực hiện major changes.
+Pull requests are welcome!
 
 ---
 
