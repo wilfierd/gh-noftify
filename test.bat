@@ -1,0 +1,59 @@
+@echo off
+REM Test script for GitHub Notifier (Windows)
+REM Chạy script này để test tool trước khi deploy
+
+echo 🧪 Testing GitHub Notifier...
+
+REM Kiểm tra Go version
+echo 📋 Checking Go version...
+go version
+
+REM Kiểm tra environment variables
+echo 🔐 Checking environment variables...
+if "%GITHUB_TOKEN%"=="" (
+    echo ❌ GITHUB_TOKEN is not set
+    echo Please set: set GITHUB_TOKEN=your_token_here
+    exit /b 1
+)
+
+if "%DISCORD_WEBHOOK%"=="" (
+    echo ❌ DISCORD_WEBHOOK is not set
+    echo Please set: set DISCORD_WEBHOOK=your_webhook_url
+    exit /b 1
+)
+
+echo ✅ Environment variables are set
+
+REM Download dependencies
+echo 📦 Downloading dependencies...
+go mod download
+
+REM Build application
+echo 🔨 Building application...
+go build -o gh-notify.exe main.go
+
+if %errorlevel% neq 0 (
+    echo ❌ Build failed
+    exit /b 1
+)
+
+echo ✅ Build successful
+
+REM Run test
+echo 🚀 Running test...
+if "%GITHUB_USERNAME%"=="" (
+    for /f "tokens=*" %%i in ('git config user.name') do set GITHUB_USERNAME=%%i
+)
+gh-notify.exe
+
+if %errorlevel% equ 0 (
+    echo ✅ Test completed successfully!
+    echo 🎉 Your GitHub Notifier is ready to deploy!
+) else (
+    echo ❌ Test failed
+    exit /b 1
+)
+
+REM Clean up
+del gh-notify.exe
+echo 🧹 Cleaned up test files

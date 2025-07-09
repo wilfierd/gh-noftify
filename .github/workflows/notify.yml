@@ -1,0 +1,67 @@
+name: GitHub Notifier
+
+on:
+  schedule:
+    # Mỗi 5 phút để check alerts
+    - cron: '*/5 * * * *'
+    # 9h sáng VN = 2h UTC cho daily report
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Cho phép chạy thủ công
+    inputs:
+      force_daily:
+        description: 'Force daily report'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+            
+      - name: Download dependencies
+        run: go mod download
+        
+      - name: Build application
+        run: go build -o gh-notify main.go
+        
+      - name: Run GitHub Notifier
+        run: ./gh-notify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GITHUB_USERNAME: ${{ github.actor }}
+          CHECK_INTERVAL: '5m'
+          DAILY_REPORT_TIME: '02:00'
+          CACHE_FILE: 'cache.json'
+          TIMEZONE: 'Asia/Ho_Chi_Minh'
+          GITHUB_ACTIONS: 'true'
+          
+      - name: Commit and push cache changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add cache.json
+          git diff --staged --quiet || git commit -m "Update cache state [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        continue-on-error: true  # Don't fail if no changes to commit
