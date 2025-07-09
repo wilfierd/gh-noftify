@@ -5,7 +5,7 @@ REM Replace these values with your actual tokens and webhooks
 echo Setting up environment variables...
 
 REM GitHub Personal Access Token (replace with your actual token)
-set GITHUB_TOKEN=your_github_token_here
+set GITHUB_TOKEN=
 
 REM Discord Webhook URL (replace with your actual webhook)
 set DISCORD_WEBHOOK=
