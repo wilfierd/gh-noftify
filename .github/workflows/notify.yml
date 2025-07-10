@@ -14,6 +14,12 @@ name: GitHub Notifier
 #         default: false
 #         type: boolean
 on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'cache.json'
+      - 'README.md'
+      - '*.md'
   workflow_dispatch:  # Chỉ chạy manual
     inputs:
       check_type:
@@ -55,6 +61,23 @@ jobs:
       - name: Build application
         run: go build -o gh-notify main.go
         
+      - name: Send commit notification
+        if: github.event_name == 'push'
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "embeds": [{
+                   "title": "📝 New Commit Pushed",
+                   "description": "**Repository:** `${{ github.repository }}`\n**Branch:** `${{ github.ref_name }}`\n**Commit:** `${{ github.sha }}`\n**Message:** ${{ toJson(github.event.head_commit.message) }}\n**Author:** ${{ github.event.head_commit.author.name }}",
+                   "color": 3447003,
+                   "timestamp": "${{ github.event.head_commit.timestamp }}",
+                   "url": "${{ github.event.head_commit.url }}"
+                 }]
+               }' \
+               ${{ secrets.DISCORD_WEBHOOK }}
+        continue-on-error: true
+               
       - name: Run GitHub Notifier
         run: ./gh-notify
         env:

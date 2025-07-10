@@ -80,6 +80,28 @@ type WorkflowRun struct {
 	Repository Repo      `json:"repository"`
 }
 
+type Commit struct {
+	SHA       string    `json:"sha"`
+	Message   string    `json:"message"`
+	Author    User      `json:"author"`
+	Committer User      `json:"committer"`
+	Date      time.Time `json:"date"`
+	URL       string    `json:"html_url"`
+}
+
+type CommitResponse struct {
+	SHA    string `json:"sha"`
+	Commit struct {
+		Message string `json:"message"`
+		Author  struct {
+			Name string    `json:"name"`
+			Date time.Time `json:"date"`
+		} `json:"author"`
+	} `json:"commit"`
+	HTMLURL string `json:"html_url"`
+	Author  User   `json:"author"`
+}
+
 func NewClient(token string) *Client {
 	return &Client{
 		token:      token,
@@ -240,4 +262,37 @@ func (c *Client) GetUser() (*User, error) {
 	}
 
 	return &user, nil
+}
+
+func (c *Client) GetRecentCommits(repo string, since time.Time) ([]Commit, error) {
+	url := fmt.Sprintf("%s/repos/%s/commits?since=%s",
+		c.baseURL, repo, since.Format(time.RFC3339))
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commits: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error: status %d", resp.StatusCode)
+	}
+
+	var commitResponses []CommitResponse
+	if err := json.NewDecoder(resp.Body).Decode(&commitResponses); err != nil {
+		return nil, fmt.Errorf("failed to decode commits: %w", err)
+	}
+
+	commits := make([]Commit, len(commitResponses))
+	for i, cr := range commitResponses {
+		commits[i] = Commit{
+			SHA:     cr.SHA,
+			Message: cr.Commit.Message,
+			Author:  cr.Author,
+			Date:    cr.Commit.Author.Date,
+			URL:     cr.HTMLURL,
+		}
+	}
+
+	return commits, nil
 }
