@@ -101,25 +101,6 @@ go run main.go
 🐛 Issues resolved: 1 issue closed
 ```
 
-## 🛠 Cấu trúc dự án
-
-```
-gh-notify/
-├── main.go                 # Entry point
-├── github/
-│   ├── api.go             # GitHub API client
-│   ├── checker.go         # Logic kiểm tra alerts
-├── notify/
-│   ├── discord.go         # Discord webhook
-│   ├── format.go          # Format thông báo
-├── config/
-│   └── config.go          # Cấu hình env
-├── cache/
-│   └── state.go           # Quản lý cache
-└── .github/workflows/
-    └── notify.yml         # GitHub Actions
-```
-
 ## 🤝 Contributing
 
 Pull requests are welcome!
