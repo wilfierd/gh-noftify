@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
+		fmt.Printf("Running GitHub Notifier for user	// Save state
+	if err := state.Save(cfg.CacheFile); err != nil {
+		log.Printf("Warning: Failed to save cache state: %v", err)
+	}
 
+	fmt.Println("GitHub Notifier completed successfully")name)
 	"github.com/gh-notify/cache"
 	"github.com/gh-notify/config"
 	"github.com/gh-notify/github"
