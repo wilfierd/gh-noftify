@@ -50,13 +50,6 @@ func main() {
 
 	fmt.Printf("Running GitHub Notifier for user: %s\n", username)
 
-	// Send startup message to Discord (optional test)
-	startupMsg := fmt.Sprintf("🚀 GitHub Notifier started for user **%s** at %s",
-		username, time.Now().Format("2006-01-02 15:04:05"))
-	if err := discordNotifier.SendSimpleMessage(startupMsg); err != nil {
-		log.Printf("Warning: Failed to send startup message: %v", err)
-	}
-
 	// Determine what to run based on time and last execution
 	now := time.Now()
 
@@ -97,13 +90,6 @@ func main() {
 	// Save state
 	if err := state.Save(cfg.CacheFile); err != nil {
 		log.Printf("Warning: Failed to save cache state: %v", err)
-	}
-
-	// Send completion message
-	completionMsg := fmt.Sprintf("✅ GitHub Notifier completed successfully for **%s** at %s",
-		username, time.Now().Format("2006-01-02 15:04:05"))
-	if err := discordNotifier.SendSimpleMessage(completionMsg); err != nil {
-		log.Printf("Warning: Failed to send completion message: %v", err)
 	}
 
 	fmt.Println("GitHub Notifier completed successfully")

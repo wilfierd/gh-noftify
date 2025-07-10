@@ -214,6 +214,44 @@ func getNotificationIcon(reason string) string {
 	}
 }
 
+func FormatCommitNotification(sha, message, author, repoName, commitURL, repoURL string) (*DiscordMessage, error) {
+	shortSHA := sha
+	if len(sha) > 7 {
+		shortSHA = sha[:7]
+	}
+
+	return &DiscordMessage{
+		Embeds: []Embed{
+			{
+				Title:       "📝 New Commit Pushed",
+				Description: fmt.Sprintf("Here's the latest commit from **%s**!", author),
+				Color:       ColorBlue,
+				Timestamp:   time.Now().Format(time.RFC3339),
+				Fields: []Field{
+					{
+						Name:   "🚀 Commit Details",
+						Value:  fmt.Sprintf("**[%s](%s)** %s", shortSHA, commitURL, message),
+						Inline: false,
+					},
+					{
+						Name:   "👤 Author",
+						Value:  author,
+						Inline: true,
+					},
+					{
+						Name:   "📂 Repository",
+						Value:  fmt.Sprintf("[%s](%s)", repoName, repoURL),
+						Inline: true,
+					},
+				},
+				Footer: &Footer{
+					Text: "GitHub Notifier • Commit Tracker",
+				},
+			},
+		},
+	}, nil
+}
+
 func FormatSimpleAlert(title, message string) string {
 	return fmt.Sprintf("🔔 **%s**\n%s", title, message)
 }
