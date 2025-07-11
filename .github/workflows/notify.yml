@@ -61,6 +61,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GITHUB_USERNAME: ${{ github.actor }}
+          CHECK_TYPE: ${{ github.event.inputs.check_type || 'both' }}  # Use manual input or default to 'both'
           CHECK_INTERVAL: '5m'
           DAILY_REPORT_TIME: '02:00'
           CACHE_FILE: 'cache.json'
