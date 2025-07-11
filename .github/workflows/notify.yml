@@ -5,7 +5,7 @@ on:
     # 7:00 AM Vietnam = 0:00 UTC - Morning digest
     - cron: '0 0 * * *'
     # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
-    - cron: '0 14 * * *'
+    - cron: '30 15 * * *'
     # Every 10 minutes for instant checks
     - cron: '*/10 * * * *'
   push:
