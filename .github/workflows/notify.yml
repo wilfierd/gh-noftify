@@ -1,26 +1,20 @@
 name: GitHub Notifier
 
-# on:
-#   schedule:
-#     # Mỗi 5 phút để check alerts
-#     - cron: '*/5 * * * *'
-#     # 9h sáng VN = 2h UTC cho daily report
-#     - cron: '0 2 * * *'
-#   workflow_dispatch:  # Cho phép chạy thủ công
-#     inputs:
-#       force_daily:
-#         description: 'Force daily report'
-#         required: false
-#         default: false
-#         type: boolean
 on:
+  schedule:
+    # 7:00 AM Vietnam = 0:00 UTC - Morning digest
+    - cron: '0 0 * * *'
+    # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
+    - cron: '0 14 * * *'
+    # Every 10 minutes for instant checks
+    - cron: '*/10 * * * *'
   push:
     branches: [ main ]
     paths-ignore:
       - 'cache.json'
       - 'README.md'
       - '*.md'
-  workflow_dispatch:  # Chỉ chạy manual
+  workflow_dispatch:  # Manual trigger
     inputs:
       check_type:
         description: 'Type of check to run'
@@ -61,23 +55,6 @@ jobs:
       - name: Build application
         run: go build -o gh-notify main.go
         
-      - name: Send commit notification
-        if: github.event_name == 'push'
-        run: |
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d '{
-                 "embeds": [{
-                   "title": "📝 New Commit Pushed",
-                   "description": "**Repository:** `${{ github.repository }}`\n**Branch:** `${{ github.ref_name }}`\n**Commit:** `${{ github.sha }}`\n**Message:** ${{ toJson(github.event.head_commit.message) }}\n**Author:** ${{ github.event.head_commit.author.name }}",
-                   "color": 3447003,
-                   "timestamp": "${{ github.event.head_commit.timestamp }}",
-                   "url": "${{ github.event.head_commit.url }}"
-                 }]
-               }' \
-               ${{ secrets.DISCORD_WEBHOOK }}
-        continue-on-error: true
-               
       - name: Run GitHub Notifier
         run: ./gh-notify
         env:
