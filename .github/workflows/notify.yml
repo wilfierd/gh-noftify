@@ -45,7 +45,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-2025  # Update pattern to avoid conflicts
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-v2  # Update pattern to avoid conflicts
           restore-keys: |
             ${{ runner.os }}-go-
             
