@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gh-notify/github"
+	"github.com/wilfierd/gh-notify/github"
 )
 
 func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {

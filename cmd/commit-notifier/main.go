@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/gh-notify/notify"
+	"github.com/wilfierd/gh-notify/notify"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/gh-notify
+module github.com/wilfierd/gh-notify
 
 go 1.22
 

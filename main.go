@@ -6,19 +6,34 @@ import (
 	"os"
 	"time"
 
-	"github.com/gh-notify/cache"
-	"github.com/gh-notify/config"
-	"github.com/gh-notify/github"
-	"github.com/gh-notify/notify"
+	"github.com/wilfierd/gh-notify/cache"  
+    "github.com/wilfierd/gh-notify/config"   
+    "github.com/wilfierd/gh-notify/github"  
+    "github.com/wilfierd/gh-notify/notify"
 	"github.com/joho/godotenv"
 )
-
+ 
 func main() {
 	// Load .env file if exists (silent fail for production)
-	_ = godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Printf("DEBUG: No .env file found: %v\n", err)
+	} else {
+		fmt.Println("DEBUG: .env file loaded successfully")
+	}
+
+	// Debug environment variables
+	fmt.Printf("DEBUG: CHECK_TYPE = '%s'\n", os.Getenv("CHECK_TYPE"))
+	fmt.Printf("DEBUG: CHECK_INTERVAL = '%s'\n", os.Getenv("CHECK_INTERVAL"))
+	fmt.Printf("DEBUG: DAILY_REPORT_TIME = '%s'\n", os.Getenv("DAILY_REPORT_TIME"))
+	fmt.Printf("DEBUG: Current time = %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
 	// Load configuration
 	cfg := config.Load()
+
+	// Debug config values
+	fmt.Printf("DEBUG: cfg.CheckInterval = %v\n", cfg.CheckInterval)
+	fmt.Printf("DEBUG: cfg.DailyReportTime = '%s'\n", cfg.DailyReportTime)
 
 	// Validate required configuration
 	if cfg.GitHubToken == "" {
@@ -28,11 +43,36 @@ func main() {
 		log.Fatal("DISCORD_WEBHOOK environment variable is required")
 	}
 
+	// Determine what to run based on time and last execution
+	now := time.Now()
+
 	// Load or create cache state
 	state, err := cache.LoadState(cfg.CacheFile)
 	if err != nil {
 		log.Fatalf("Failed to load cache state: %v", err)
 	}
+
+	// Debug cache state
+	fmt.Printf("DEBUG: Last check time = %s\n", state.LastCheck.Format("2006-01-02 15:04:05"))
+	fmt.Printf("DEBUG: Last daily report = %s\n", state.LastDailyReport.Format("2006-01-02 15:04:05"))
+	fmt.Printf("DEBUG: Time since last check = %v\n", time.Since(state.LastCheck))
+
+	// Check if it's time for daily report (around 9 AM Vietnam time)
+	shouldRunDailyReport := shouldRunDaily(now, state.LastDailyReport, cfg.DailyReportTime)
+
+	// Always run instant checks
+	shouldRunInstantCheck := time.Since(state.LastCheck) >= cfg.CheckInterval
+
+	fmt.Printf("DEBUG: shouldRunDaily conditions:\n")
+	fmt.Printf("  - Current time: %s\n", now.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  - Target daily time: %s\n", cfg.DailyReportTime)
+	fmt.Printf("  - Last daily report: %s\n", state.LastDailyReport.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  - Should run daily: %t\n", shouldRunDailyReport)
+
+	fmt.Printf("DEBUG: shouldRunInstant conditions:\n")
+	fmt.Printf("  - Check interval: %v\n", cfg.CheckInterval)
+	fmt.Printf("  - Time since last check: %v\n", time.Since(state.LastCheck))
+	fmt.Printf("  - Should run instant: %t\n", shouldRunInstantCheck)
 
 	// Initialize clients
 	githubClient := github.NewClient(cfg.GitHubToken)
@@ -47,17 +87,6 @@ func main() {
 		}
 		username = user.Login
 	}
-
-	fmt.Printf("Running GitHub Notifier for user: %s\n", username)
-
-	// Determine what to run based on time and last execution
-	now := time.Now()
-
-	// Check if it's time for daily report (around 9 AM Vietnam time)
-	shouldRunDailyReport := shouldRunDaily(now, state.LastDailyReport, cfg.DailyReportTime)
-
-	// Always run instant checks
-	shouldRunInstantCheck := time.Since(state.LastCheck) >= cfg.CheckInterval
 
 	fmt.Printf("Running GitHub Notifier for user: %s\n", username)
 	fmt.Printf("Daily report: %t, Instant check: %t\n", shouldRunDailyReport, shouldRunInstantCheck)
