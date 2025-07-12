@@ -1,5 +1,4 @@
 name: GitHub Notifier
-
 on:
   schedule:
     # 7:00 AM Vietnam = 0:00 UTC - Morning digest
@@ -29,16 +28,17 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    
+   
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+       
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          
+         
+      # Cache TRƯỚC khi download - quan trọng!
       - name: Cache Go modules
         id: cache
         uses: actions/cache@v4
@@ -46,52 +46,30 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-v3
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-v5
           restore-keys: |
             ${{ runner.os }}-go-
-        continue-on-error: true  # Don't fail workflow if cache fails
-
-      - name: Debug cache status
-        run: |
-          echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "Cache outcome: ${{ steps.cache.outcome }}"
-          echo "Cache conclusion: ${{ steps.cache.conclusion }}"
-          ls -la ~/.cache/go-build/ || echo "go-build cache missing"
-          ls -la ~/go/pkg/mod/ || echo "pkg/mod cache missing"
-
-      - name: Clean cache directories on restore failure
-        run: |
-          # Always clean if previous step had issues
-          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
-            echo "Cache missed or failed, cleaning directories..."
-            rm -rf ~/.cache/go-build || true
-            rm -rf ~/go/pkg/mod || true
-            mkdir -p ~/.cache/go-build
-            mkdir -p ~/go/pkg/mod
-          else
-            echo "Cache hit successful, keeping cache"
-          fi
         continue-on-error: true
-            
+        
       - name: Download dependencies
         run: go mod download
-        
+       
       - name: Build application
         run: go build -o gh-notify main.go
-        
+       
       - name: Run GitHub Notifier
         run: ./gh-notify
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GITHUB_USERNAME: ${{ github.actor }}
-          CHECK_TYPE: ${{ github.event.inputs.check_type || 'both' }}  # Use manual input or default to 'both'
+          CHECK_TYPE: ${{ github.event.inputs.check_type || 'both' }}
           CHECK_INTERVAL: '5m'
           DAILY_REPORT_TIME: '02:00'
           CACHE_FILE: 'cache.json'
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
-          
+         
       - name: Commit and push cache changes
         run: |
           git config --local user.email "action@github.com"
@@ -101,4 +79,4 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        continue-on-error: true  # Don't fail if no changes to commit
+        continue-on-error: true
