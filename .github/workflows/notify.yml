@@ -40,14 +40,26 @@ jobs:
           go-version: '1.22'
           
       - name: Cache Go modules
+        id: cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-v2.1  # Update pattern to avoid conflicts
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-v3
           restore-keys: |
             ${{ runner.os }}-go-
+        continue-on-error: true  # Don't fail workflow if cache fails
+
+      - name: Clean cache directories on restore failure
+        if: failure() || steps.cache.outcome == 'failure'
+        run: |
+          echo "Cache restore failed, cleaning directories..."
+          rm -rf ~/.cache/go-build || true
+          rm -rf ~/go/pkg/mod || true
+          mkdir -p ~/.cache/go-build
+          mkdir -p ~/go/pkg/mod
+        continue-on-error: true
             
       - name: Download dependencies
         run: go mod download
