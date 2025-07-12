@@ -51,14 +51,26 @@ jobs:
             ${{ runner.os }}-go-
         continue-on-error: true  # Don't fail workflow if cache fails
 
-      - name: Clean cache directories on restore failure
-        if: failure() || steps.cache.outcome == 'failure'
+      - name: Debug cache status
         run: |
-          echo "Cache restore failed, cleaning directories..."
-          rm -rf ~/.cache/go-build || true
-          rm -rf ~/go/pkg/mod || true
-          mkdir -p ~/.cache/go-build
-          mkdir -p ~/go/pkg/mod
+          echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
+          echo "Cache outcome: ${{ steps.cache.outcome }}"
+          echo "Cache conclusion: ${{ steps.cache.conclusion }}"
+          ls -la ~/.cache/go-build/ || echo "go-build cache missing"
+          ls -la ~/go/pkg/mod/ || echo "pkg/mod cache missing"
+
+      - name: Clean cache directories on restore failure
+        run: |
+          # Always clean if previous step had issues
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "Cache missed or failed, cleaning directories..."
+            rm -rf ~/.cache/go-build || true
+            rm -rf ~/go/pkg/mod || true
+            mkdir -p ~/.cache/go-build
+            mkdir -p ~/go/pkg/mod
+          else
+            echo "Cache hit successful, keeping cache"
+          fi
         continue-on-error: true
             
       - name: Download dependencies
