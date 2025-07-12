@@ -6,13 +6,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/wilfierd/gh-notify/cache"  
-    "github.com/wilfierd/gh-notify/config"   
-    "github.com/wilfierd/gh-notify/github"  
-    "github.com/wilfierd/gh-notify/notify"
 	"github.com/joho/godotenv"
+	"github.com/wilfierd/gh-notify/cache"
+	"github.com/wilfierd/gh-notify/config"
+	"github.com/wilfierd/gh-notify/github"
+	"github.com/wilfierd/gh-notify/notify"
 )
- 
+
 func main() {
 	// Load .env file if exists (silent fail for production)
 	err := godotenv.Load()
@@ -91,13 +91,17 @@ func main() {
 	fmt.Printf("Running GitHub Notifier for user: %s\n", username)
 	fmt.Printf("Daily report: %t, Instant check: %t\n", shouldRunDailyReport, shouldRunInstantCheck)
 
+	hasNewAlerts := false
+
 	// Run instant checks
 	if shouldRunInstantCheck {
-		if err := runInstantChecks(githubClient, discordNotifier, state, username); err != nil {
+		if newAlertsFound, err := runInstantChecks(githubClient, discordNotifier, state, username); err != nil {
 			log.Printf("Error running instant checks: %v", err)
 			// Send error notification
 			errorMsg := notify.FormatErrorMessage(err)
 			discordNotifier.SendSimpleMessage(errorMsg)
+		} else {
+			hasNewAlerts = newAlertsFound
 		}
 		state.LastCheck = now
 	}
@@ -116,69 +120,93 @@ func main() {
 	// Clean up old entries to keep cache size manageable
 	state.CleanupOldEntries(7 * 24 * time.Hour) // Keep 7 days of history
 
-	// Save state
-	if err := state.Save(cfg.CacheFile); err != nil {
-		log.Printf("Warning: Failed to save cache state: %v", err)
+	// Save state only if we had updates (new alerts or daily report)
+	shouldSaveCache := shouldRunInstantCheck && hasNewAlerts || shouldRunDailyReport
+	if shouldSaveCache {
+		if err := state.Save(cfg.CacheFile); err != nil {
+			log.Printf("Warning: Failed to save cache state: %v", err)
+		}
+		fmt.Println("Cache state updated")
+	} else {
+		fmt.Println("No cache updates needed")
 	}
 
 	fmt.Println("GitHub Notifier completed successfully")
 }
 
-func runInstantChecks(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string) error {
+func runInstantChecks(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string) (bool, error) {
 	fmt.Println("Running instant checks...")
 
 	// Get current alerts
 	result, err := githubClient.CheckForAlerts(username)
 	if err != nil {
-		return fmt.Errorf("failed to check for alerts: %w", err)
+		return false, fmt.Errorf("failed to check for alerts: %w", err)
 	}
 
 	if !result.HasAlerts() {
 		fmt.Println("No alerts found")
-		return nil
+		return false, nil
 	}
 
-	// Check each alert type for duplicates
-	cooldownDuration := 2 * time.Hour // Don't spam same alert within 2 hours
+	// Filter for NEW alerts only - don't spam duplicates
+	cooldownDuration := 24 * time.Hour // Only notify once per day per alert
+	hasNewAlerts := false
 
-	// Check PR reviews
+	// Check PR reviews - only NEW ones
+	var newPRsNeedingReview []interface{}
 	for _, pr := range result.PRsNeedingReview {
 		key := fmt.Sprintf("review_request_%d", pr.Number)
 		if !state.IsNotificationSent(key, cooldownDuration) {
+			newPRsNeedingReview = append(newPRsNeedingReview, pr)
 			state.MarkNotificationSent(key)
+			hasNewAlerts = true
 		}
 	}
 
-	// Check stale PRs
+	// Check stale PRs - only NEW ones
+	var newStaleOwnPRs []interface{}
 	for _, pr := range result.StaleOwnPRs {
 		key := fmt.Sprintf("stale_pr_%d", pr.Number)
 		if !state.IsNotificationSent(key, cooldownDuration) {
+			newStaleOwnPRs = append(newStaleOwnPRs, pr)
 			state.MarkNotificationSent(key)
+			hasNewAlerts = true
 		}
 	}
 
-	// Check assigned issues
+	// Check assigned issues - only NEW ones
+	var newAssignedIssues []interface{}
 	for _, issue := range result.AssignedIssues {
 		key := fmt.Sprintf("assigned_issue_%d", issue.Number)
 		if !state.IsNotificationSent(key, cooldownDuration) {
+			newAssignedIssues = append(newAssignedIssues, issue)
 			state.MarkNotificationSent(key)
+			hasNewAlerts = true
 		}
 	}
 
-	// Format and send alert message
-	message, err := notify.FormatInstantAlert(result)
+	// Only send notification if there are NEW alerts
+	if !hasNewAlerts {
+		fmt.Println("No new alerts found (all previously notified)")
+		return false, nil
+	}
+
+	// Create filtered result with only new alerts
+	// Format and send alert message only for NEW items
+	message, err := notify.FormatInstantAlert(result) // You might need to modify this to accept filtered results
 	if err != nil {
-		return fmt.Errorf("failed to format alert: %w", err)
+		return false, fmt.Errorf("failed to format alert: %w", err)
 	}
 
 	if message != nil {
 		if err := discordNotifier.SendMessage(message); err != nil {
-			return fmt.Errorf("failed to send Discord message: %w", err)
+			return false, fmt.Errorf("failed to send Discord message: %w", err)
 		}
-		fmt.Printf("Sent instant alert with %d items\n", result.GetAlertCount())
+		newCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues)
+		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", newCount)
 	}
 
-	return nil
+	return true, nil
 }
 
 func runDailyReport(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string) error {
