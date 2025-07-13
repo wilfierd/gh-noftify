@@ -4,7 +4,7 @@ on:
     # 7:00 AM Vietnam = 0:00 UTC - Morning digest
     - cron: '0 0 * * *'
     # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
-    - cron: '30 15 * * *'
+    - cron: '0 14 * * *'
     # Every 30 minutes for instant checks
     - cron: '*/30 * * * *'
   push:
@@ -22,7 +22,8 @@ on:
         type: choice
         options:
         - instant
-        - daily
+        - morning
+        - evening
         - both
 
 jobs:
@@ -52,12 +53,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GITHUB_USERNAME: ${{ github.actor }}
-          CHECK_TYPE: ${{ github.event.inputs.check_type || 'both' }}
+          CHECK_TYPE: ${{ github.event.inputs.check_type || 'auto' }}
           CHECK_INTERVAL: '5m'
           DAILY_REPORT_TIME: '02:00'
           CACHE_FILE: 'cache.json'
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
+          SCHEDULE_TYPE: ${{ github.event.schedule }}
          
       - name: Commit and push cache changes
         run: |

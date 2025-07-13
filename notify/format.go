@@ -109,54 +109,139 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 
 func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMessage, error) {
 	var fields []Field
-
 	dateStr := digest.Date.Format("2006-01-02")
 
-	// PRs opened
-	if len(digest.PRsOpened) > 0 {
-		var prList []string
-		for _, pr := range digest.PRsOpened {
-			prList = append(prList, fmt.Sprintf("• [#%d %s](%s)", pr.Number, pr.Title, pr.HTMLURL))
+	var title, description string
+	var color int
+
+	if digest.IsEvening {
+		// Evening Digest - Show accomplishments
+		title = fmt.Sprintf("🌆 Evening Summary – %s", dateStr)
+		description = fmt.Sprintf("Here's what you accomplished today, %s!", username)
+		color = 0x00FF00 // Green for accomplishments
+
+		hasActivity := false
+
+		// PRs opened today
+		if len(digest.PRsOpened) > 0 {
+			var prList []string
+			for _, pr := range digest.PRsOpened {
+				prList = append(prList, fmt.Sprintf("• [#%d %s](%s)", pr.Number, pr.Title, pr.HTMLURL))
+			}
+			fields = append(fields, Field{
+				Name:   "📤 Pull Requests Opened",
+				Value:  strings.Join(prList, "\n"),
+				Inline: false,
+			})
+			hasActivity = true
 		}
-		fields = append(fields, Field{
-			Name:   "📤 PRs you opened",
-			Value:  strings.Join(prList, "\n"),
-			Inline: false,
-		})
-	}
 
-	// PRs merged
-	if len(digest.PRsMerged) > 0 {
-		var prList []string
-		for _, pr := range digest.PRsMerged {
-			prList = append(prList, fmt.Sprintf("• [#%d %s](%s)", pr.Number, pr.Title, pr.HTMLURL))
+		// PRs merged today
+		if len(digest.PRsMerged) > 0 {
+			var prList []string
+			for _, pr := range digest.PRsMerged {
+				prList = append(prList, fmt.Sprintf("• [#%d %s](%s)", pr.Number, pr.Title, pr.HTMLURL))
+			}
+			fields = append(fields, Field{
+				Name:   "✅ Pull Requests Merged",
+				Value:  strings.Join(prList, "\n"),
+				Inline: false,
+			})
+			hasActivity = true
 		}
-		fields = append(fields, Field{
-			Name:   "✅ PRs merged",
-			Value:  strings.Join(prList, "\n"),
-			Inline: false,
-		})
+
+		// Issues opened today
+		if len(digest.IssuesOpened) > 0 {
+			var issueList []string
+			for _, issue := range digest.IssuesOpened {
+				issueList = append(issueList, fmt.Sprintf("• [#%d %s](%s)", issue.Number, issue.Title, issue.HTMLURL))
+			}
+			fields = append(fields, Field{
+				Name:   "🐛 Issues Opened",
+				Value:  strings.Join(issueList, "\n"),
+				Inline: false,
+			})
+			hasActivity = true
+		}
+
+		// Issues closed today
+		if len(digest.IssuesClosed) > 0 {
+			var issueList []string
+			for _, issue := range digest.IssuesClosed {
+				issueList = append(issueList, fmt.Sprintf("• [#%d %s](%s)", issue.Number, issue.Title, issue.HTMLURL))
+			}
+			fields = append(fields, Field{
+				Name:   "✅ Issues Resolved",
+				Value:  strings.Join(issueList, "\n"),
+				Inline: false,
+			})
+			hasActivity = true
+		}
+
+		// Commit count
+		if digest.CommitsToday > 0 {
+			fields = append(fields, Field{
+				Name:   "💻 Activity",
+				Value:  fmt.Sprintf("%d commits/PRs today", digest.CommitsToday),
+				Inline: true,
+			})
+			hasActivity = true
+		}
+
+		if !hasActivity {
+			fields = append(fields, Field{
+				Name:   "🌙 Quiet day",
+				Value:  "No significant GitHub activity today",
+				Inline: false,
+			})
+		}
+
+	} else {
+		// Morning Digest - Show what needs attention
+		title = fmt.Sprintf("🌅 Morning Briefing – %s", dateStr)
+		description = fmt.Sprintf("Good morning %s! Here's what needs your attention:", username)
+		color = 0xFFAA00 // Orange for attention needed
+
+		hasWork := false
+
+		// Pending reviews
+		if len(digest.PendingReviews) > 0 {
+			var prList []string
+			for _, pr := range digest.PendingReviews {
+				prList = append(prList, fmt.Sprintf("• [#%d %s](%s)", pr.Number, pr.Title, pr.HTMLURL))
+			}
+			fields = append(fields, Field{
+				Name:   "� Reviews Waiting",
+				Value:  strings.Join(prList, "\n"),
+				Inline: false,
+			})
+			hasWork = true
+		}
+
+		// Assigned issues
+		if len(digest.AssignedIssues) > 0 {
+			var issueList []string
+			for _, issue := range digest.AssignedIssues {
+				issueList = append(issueList, fmt.Sprintf("• [#%d %s](%s)", issue.Number, issue.Title, issue.HTMLURL))
+			}
+			fields = append(fields, Field{
+				Name:   "📝 Issues Assigned",
+				Value:  strings.Join(issueList, "\n"),
+				Inline: false,
+			})
+			hasWork = true
+		}
+
+		if !hasWork {
+			fields = append(fields, Field{
+				Name:   "✨ All clear!",
+				Value:  "No pending reviews or assigned issues",
+				Inline: false,
+			})
+		}
 	}
 
-	// Reviews given
-	if len(digest.ReviewsGiven) > 0 {
-		fields = append(fields, Field{
-			Name:   "🔍 Reviews given",
-			Value:  fmt.Sprintf("%d reviews completed", len(digest.ReviewsGiven)),
-			Inline: true,
-		})
-	}
-
-	// Issues resolved
-	if len(digest.IssuesResolved) > 0 {
-		fields = append(fields, Field{
-			Name:   "🐛 Issues resolved",
-			Value:  fmt.Sprintf("%d issues closed", len(digest.IssuesResolved)),
-			Inline: true,
-		})
-	}
-
-	// Failed workflows
+	// Failed workflows (show in both morning and evening)
 	if len(digest.FailedWorkflows) > 0 {
 		var workflowList []string
 		for _, workflow := range digest.FailedWorkflows {
@@ -164,17 +249,8 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 				workflow.Name, workflow.HTMLURL, workflow.Repository.Name))
 		}
 		fields = append(fields, Field{
-			Name:   "🚨 Failed workflows",
+			Name:   "🚨 Failed Workflows",
 			Value:  strings.Join(workflowList, "\n"),
-			Inline: false,
-		})
-	}
-
-	// If no activity, add a default message
-	if len(fields) == 0 {
-		fields = append(fields, Field{
-			Name:   "🌙 Quiet day",
-			Value:  "No significant GitHub activity today",
 			Inline: false,
 		})
 	}
@@ -182,9 +258,9 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 	return &DiscordMessage{
 		Embeds: []Embed{
 			{
-				Title:       fmt.Sprintf("🧠 Daily Digest – %s", dateStr),
-				Description: fmt.Sprintf("Here's your GitHub activity summary for today, %s!", username),
-				Color:       ColorPurple,
+				Title:       title,
+				Description: description,
+				Color:       color,
 				Timestamp:   time.Now().Format(time.RFC3339),
 				Fields:      fields,
 				Footer: &Footer{

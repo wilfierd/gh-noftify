@@ -296,3 +296,23 @@ func (c *Client) GetRecentCommits(repo string, since time.Time) ([]Commit, error
 
 	return commits, nil
 }
+
+func (c *Client) GetUserIssues(username string) ([]Issue, error) {
+	url := fmt.Sprintf("%s/search/issues?q=type:issue+author:%s", c.baseURL, username)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user issues: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Items []Issue `json:"items"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Items, nil
+}

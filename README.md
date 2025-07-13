@@ -43,18 +43,20 @@ Your `GH_TOKEN` needs these scopes:
 
 | Time (Vietnam) | Time (UTC) | Type | Description |
 |---------------|------------|------|-------------|
-| 7:00 AM | 0:00 UTC | Daily Digest | Morning summary |
-| 9:00 PM | 15:30 UTC | Daily Digest | Evening summary |
+| 7:00 AM | 0:00 UTC | Morning Digest | What needs your attention today |
+| 9:00 PM | 14:00 UTC | Evening Digest | Your accomplishments summary |
 | Every 30 min | Every 30 min | Instant Check | New alerts only |
 
 ## Manual Usage
 
-Run the workflow manually with different check types:
+Run the workflow manually with different options:
 
+### Check Types
 1. Go to `Actions` tab → `GitHub Notifier` → `Run workflow`
 2. Choose check type:
    - **`instant`** - Check for new alerts only
-   - **`daily`** - Generate digest report only  
+   - **`morning`** - Generate morning briefing (what needs attention)
+   - **`evening`** - Generate evening summary (accomplishments)  
    - **`both`** - Run both instant and daily checks
 
 ## Configuration
@@ -62,7 +64,7 @@ Run the workflow manually with different check types:
 The workflow uses these environment variables:
 
 ```yaml
-CHECK_TYPE: 'both'                    # instant, daily, or both
+CHECK_TYPE: 'both'                    # instant, morning, evening, or both
 CHECK_INTERVAL: '5m'                  # Time between checks
 DAILY_REPORT_TIME: '02:00'           # Daily report time (Vietnam timezone)
 CACHE_FILE: 'cache.json'             # Cache file location

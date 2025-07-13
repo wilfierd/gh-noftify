@@ -24,6 +24,7 @@ func main() {
 
 	// Debug environment variables
 	fmt.Printf("DEBUG: CHECK_TYPE = '%s'\n", os.Getenv("CHECK_TYPE"))
+	fmt.Printf("DEBUG: SCHEDULE_TYPE = '%s'\n", os.Getenv("SCHEDULE_TYPE"))
 	fmt.Printf("DEBUG: CHECK_INTERVAL = '%s'\n", os.Getenv("CHECK_INTERVAL"))
 	fmt.Printf("DEBUG: DAILY_REPORT_TIME = '%s'\n", os.Getenv("DAILY_REPORT_TIME"))
 	fmt.Printf("DEBUG: Current time = %s\n", time.Now().Format("2006-01-02 15:04:05"))
@@ -43,8 +44,24 @@ func main() {
 		log.Fatal("DISCORD_WEBHOOK environment variable is required")
 	}
 
-	// Determine what to run based on time and last execution
+	// Determine what to run based on time and environment
 	now := time.Now()
+	checkType := os.Getenv("CHECK_TYPE")
+	scheduleType := os.Getenv("SCHEDULE_TYPE")
+
+	// Auto-detect based on schedule trigger
+	if checkType == "auto" {
+		switch scheduleType {
+		case "0 0 * * *": // 7 AM Vietnam time - Morning digest
+			checkType = "morning"
+		case "0 14 * * *": // 9 PM Vietnam time - Evening digest
+			checkType = "evening"
+		default: // Every 30 minutes - Instant checks
+			checkType = "instant"
+		}
+	}
+
+	fmt.Printf("DEBUG: Determined check type: %s (from schedule: %s)\n", checkType, scheduleType)
 
 	// Load or create cache state
 	state, err := cache.LoadState(cfg.CacheFile)
@@ -57,21 +74,17 @@ func main() {
 	fmt.Printf("DEBUG: Last daily report = %s\n", state.LastDailyReport.Format("2006-01-02 15:04:05"))
 	fmt.Printf("DEBUG: Time since last check = %v\n", time.Since(state.LastCheck))
 
-	// Check if it's time for daily report (around 9 AM Vietnam time)
-	shouldRunDailyReport := shouldRunDaily(now, state.LastDailyReport, cfg.DailyReportTime)
+	// Determine what to run based on check type
+	shouldRunMorningDigest := checkType == "morning" || checkType == "both"
+	shouldRunEveningDigest := checkType == "evening" || checkType == "both"
+	shouldRunDailyReport := shouldRunMorningDigest || shouldRunEveningDigest
+	shouldRunInstantCheck := checkType == "instant" || checkType == "both" || (checkType == "auto" && scheduleType == "")
 
-	// Always run instant checks
-	shouldRunInstantCheck := time.Since(state.LastCheck) >= cfg.CheckInterval
-
-	fmt.Printf("DEBUG: shouldRunDaily conditions:\n")
-	fmt.Printf("  - Current time: %s\n", now.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  - Target daily time: %s\n", cfg.DailyReportTime)
-	fmt.Printf("  - Last daily report: %s\n", state.LastDailyReport.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  - Should run daily: %t\n", shouldRunDailyReport)
-
-	fmt.Printf("DEBUG: shouldRunInstant conditions:\n")
-	fmt.Printf("  - Check interval: %v\n", cfg.CheckInterval)
-	fmt.Printf("  - Time since last check: %v\n", time.Since(state.LastCheck))
+	fmt.Printf("DEBUG: shouldRun conditions:\n")
+	fmt.Printf("  - Check type: %s\n", checkType)
+	fmt.Printf("  - Should run morning digest: %t\n", shouldRunMorningDigest)
+	fmt.Printf("  - Should run evening digest: %t\n", shouldRunEveningDigest)
+	fmt.Printf("  - Should run daily report: %t\n", shouldRunDailyReport)
 	fmt.Printf("  - Should run instant: %t\n", shouldRunInstantCheck)
 
 	// Initialize clients
@@ -106,9 +119,10 @@ func main() {
 		state.LastCheck = now
 	}
 
-	// Run daily report
+	// Run daily report (morning or evening)
 	if shouldRunDailyReport {
-		if err := runDailyReport(githubClient, discordNotifier, state, username); err != nil {
+		isEvening := shouldRunEveningDigest
+		if err := runDailyReport(githubClient, discordNotifier, state, username, isEvening); err != nil {
 			log.Printf("Error running daily report: %v", err)
 			// Send error notification
 			errorMsg := notify.FormatErrorMessage(err)
@@ -209,14 +223,21 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	return true, nil
 }
 
-func runDailyReport(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string) error {
-	fmt.Println("Running daily report...")
+func runDailyReport(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string, isEvening bool) error {
+	if isEvening {
+		fmt.Println("Running evening digest...")
+	} else {
+		fmt.Println("Running morning digest...")
+	}
 
-	// Generate daily digest
+	// Generate daily digest with evening flag
 	digest, err := githubClient.GenerateDailyDigest(username)
 	if err != nil {
 		return fmt.Errorf("failed to generate daily digest: %w", err)
 	}
+
+	// Set the evening flag manually since we can't pass it through API
+	digest.IsEvening = isEvening
 
 	// Format and send daily digest
 	message, err := notify.FormatDailyDigest(digest, username)
@@ -228,27 +249,12 @@ func runDailyReport(githubClient *github.Client, discordNotifier *notify.Discord
 		return fmt.Errorf("failed to send Discord message: %w", err)
 	}
 
-	fmt.Println("Sent daily digest")
-	return nil
-}
-
-func shouldRunDaily(now time.Time, lastRun time.Time, dailyTime string) bool {
-	// Parse the daily time (e.g., "02:00" for 2 AM UTC = 9 AM Vietnam)
-	targetTime, err := time.Parse("15:04", dailyTime)
-	if err != nil {
-		log.Printf("Invalid daily time format: %s", dailyTime)
-		return false
+	if isEvening {
+		fmt.Println("Sent evening digest")
+	} else {
+		fmt.Println("Sent morning digest")
 	}
-
-	// Create today's target time
-	todayTarget := time.Date(now.Year(), now.Month(), now.Day(),
-		targetTime.Hour(), targetTime.Minute(), 0, 0, now.Location())
-
-	// Check if we haven't run today and it's past the target time
-	lastRunDate := lastRun.Format("2006-01-02")
-	todayDate := now.Format("2006-01-02")
-
-	return lastRunDate != todayDate && now.After(todayTarget)
+	return nil
 }
 
 func init() {

@@ -16,10 +16,15 @@ type CheckResult struct {
 type DailyDigest struct {
 	PRsOpened       []PullRequest
 	PRsMerged       []PullRequest
-	ReviewsGiven    []Review
-	IssuesResolved  []Issue
+	PRsReviewed     []PullRequest
+	IssuesOpened    []Issue
+	IssuesClosed    []Issue
+	CommitsToday    int
 	FailedWorkflows []WorkflowRun
+	PendingReviews  []PullRequest
+	AssignedIssues  []Issue
 	Date            time.Time
+	IsEvening       bool // true for evening digest, false for morning
 }
 
 func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
@@ -80,29 +85,72 @@ func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
 }
 
 func (c *Client) GenerateDailyDigest(username string) (*DailyDigest, error) {
+	now := time.Now()
+
+	// Determine if this is evening digest (after 12 PM UTC = 7 PM Vietnam)
+	isEvening := now.Hour() >= 12
+
 	digest := &DailyDigest{
-		Date: time.Now(),
+		Date:      now,
+		IsEvening: isEvening,
 	}
 
-	// Get PRs opened in the last 24 hours
-	// This is a simplified version - would need proper date filtering
-	ownPRs, err := c.GetUserPullRequests(username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user PRs: %w", err)
-	}
+	// Get time range for "today" (last 24 hours)
+	yesterday := now.AddDate(0, 0, -1)
 
-	yesterday := time.Now().AddDate(0, 0, -1)
-	for _, pr := range ownPRs {
-		if pr.CreatedAt.After(yesterday) {
-			digest.PRsOpened = append(digest.PRsOpened, pr)
+	if isEvening {
+		// Evening digest: Show what was accomplished today
+		// Get PRs opened today
+		ownPRs, err := c.GetUserPullRequests(username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user PRs: %w", err)
 		}
-	}
 
-	// TODO: Implement other digest features
-	// - PRs merged
-	// - Reviews given
-	// - Issues resolved
-	// - Failed workflows
+		for _, pr := range ownPRs {
+			if pr.CreatedAt.After(yesterday) {
+				digest.PRsOpened = append(digest.PRsOpened, pr)
+			}
+			// Check if PR was merged today
+			if pr.State == "closed" && pr.UpdatedAt.After(yesterday) {
+				digest.PRsMerged = append(digest.PRsMerged, pr)
+			}
+		}
+
+		// Get issues worked on today
+		issues, err := c.GetUserIssues(username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user issues: %w", err)
+		}
+
+		for _, issue := range issues {
+			if issue.CreatedAt.After(yesterday) {
+				digest.IssuesOpened = append(digest.IssuesOpened, issue)
+			}
+			if issue.State == "closed" && issue.UpdatedAt.After(yesterday) {
+				digest.IssuesClosed = append(digest.IssuesClosed, issue)
+			}
+		}
+
+		// Get commit count for today (simplified)
+		// This would require additional API calls to get accurate commit count
+		digest.CommitsToday = len(digest.PRsOpened) // Simplified estimation
+
+	} else {
+		// Morning digest: Show what needs attention today
+		// Get pending review requests
+		reviewRequests, err := c.GetReviewRequests(username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get review requests: %w", err)
+		}
+		digest.PendingReviews = reviewRequests
+
+		// Get assigned issues
+		assignedIssues, err := c.GetAssignedIssues(username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get assigned issues: %w", err)
+		}
+		digest.AssignedIssues = assignedIssues
+	}
 
 	return digest, nil
 }
