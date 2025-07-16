@@ -308,12 +308,7 @@ func FormatCommitNotification(sha, message, author, repoName, commitURL, repoURL
 				Inline: false,
 			},
 			{
-				Name:   "👤 Author",
-				Value:  author,
-				Inline: true,
-			},
-			{
-				Name:   "📂 Repository",
+				Name:   " Repository",
 				Value:  fmt.Sprintf("[%s](%s)", repoName, repoURL),
 				Inline: true,
 			},
@@ -324,15 +319,11 @@ func FormatCommitNotification(sha, message, author, repoName, commitURL, repoURL
 	}
 
 	// Add author avatar if available
-	fmt.Printf("DEBUG: avatarURL = '%s', author = '%s'\n", avatarURL, author)
 	if avatarURL != "" {
-		fmt.Printf("DEBUG: Setting author avatar for %s: %s\n", author, avatarURL)
 		embed.Author = &Author{
 			Name:    author,
 			IconURL: avatarURL,
 		}
-	} else {
-		fmt.Printf("DEBUG: No avatar URL provided for user: %s\n", author)
 	}
 
 	return &DiscordMessage{

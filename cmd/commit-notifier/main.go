@@ -5,11 +5,15 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/wilfierd/gh-notify/github"
 	"github.com/wilfierd/gh-notify/notify"
 )
 
 func main() {
+	// Load .env file if it exists
+	_ = godotenv.Load()
+	
 	// Get environment variables from GitHub Actions
 	sha := os.Getenv("GITHUB_SHA")
 	commitMessage := os.Getenv("COMMIT_MESSAGE")
@@ -18,7 +22,7 @@ func main() {
 	commitURL := os.Getenv("COMMIT_URL")
 	repoURL := os.Getenv("REPO_URL")
 	discordWebhook := os.Getenv("DISCORD_WEBHOOK")
-	githubToken := os.Getenv("GH_TOKEN")
+	githubToken := os.Getenv("GITHUB_TOKEN")
 
 	if discordWebhook == "" {
 		log.Fatal("DISCORD_WEBHOOK environment variable is required")
