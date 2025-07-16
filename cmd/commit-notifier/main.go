@@ -29,12 +29,22 @@ func main() {
 
 	// Get avatar URL if GitHub token is available
 	var avatarURL string
+	fmt.Printf("DEBUG: githubToken exists: %v, author: '%s'\n", githubToken != "", author)
+
 	if githubToken != "" && author != "" {
 		client := github.NewClient(githubToken)
+		fmt.Printf("DEBUG: Fetching user info for: %s\n", author)
 		if user, err := client.GetUserByUsername(author); err == nil {
 			avatarURL = user.AvatarURL
+			fmt.Printf("DEBUG: Successfully got avatar URL: %s\n", avatarURL)
+		} else {
+			fmt.Printf("DEBUG: Failed to get user info: %v\n", err)
 		}
+	} else {
+		fmt.Printf("DEBUG: Skipping avatar fetch - missing token or author\n")
 	}
+
+	fmt.Printf("DEBUG: Final avatarURL: '%s'\n", avatarURL)
 
 	// Format commit notification
 	discordMessage, err := notify.FormatCommitNotification(sha, commitMessage, author, repoName, commitURL, repoURL, avatarURL)
