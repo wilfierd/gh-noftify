@@ -34,4 +34,5 @@ jobs:
           COMMIT_URL: ${{ github.event.head_commit.url }}
           REPO_URL: ${{ github.event.repository.html_url }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         continue-on-error: true
