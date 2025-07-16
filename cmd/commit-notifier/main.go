@@ -18,7 +18,7 @@ func main() {
 	commitURL := os.Getenv("COMMIT_URL")
 	repoURL := os.Getenv("REPO_URL")
 	discordWebhook := os.Getenv("DISCORD_WEBHOOK")
-	githubToken := os.Getenv("GITHUB_TOKEN")
+	githubToken := os.Getenv("GH_TOKEN")
 
 	if discordWebhook == "" {
 		log.Fatal("DISCORD_WEBHOOK environment variable is required")
