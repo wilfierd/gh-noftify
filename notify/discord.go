@@ -19,11 +19,17 @@ type Embed struct {
 	Color       int     `json:"color,omitempty"`
 	Timestamp   string  `json:"timestamp,omitempty"`
 	Footer      *Footer `json:"footer,omitempty"`
+	Author      *Author `json:"author,omitempty"`
 	Fields      []Field `json:"fields,omitempty"`
 }
 
 type Footer struct {
 	Text string `json:"text,omitempty"`
+}
+
+type Author struct {
+	Name    string `json:"name,omitempty"`
+	IconURL string `json:"icon_url,omitempty"`
 }
 
 type Field struct {
@@ -73,7 +79,8 @@ func (d *DiscordNotifier) SendSimpleMessage(content string) error {
 	})
 }
 
-func (d *DiscordNotifier) SendEmbedMessage(title, description string, color int, fields []Field) error {
+// SendEmbedMessage sends a Discord embed message. If authorName and authorAvatarURL are provided, sets the author/avatar.
+func (d *DiscordNotifier) SendEmbedMessage(title, description string, color int, fields []Field, authorName, authorAvatarURL string) error {
 	embed := Embed{
 		Title:       title,
 		Description: description,
@@ -83,6 +90,14 @@ func (d *DiscordNotifier) SendEmbedMessage(title, description string, color int,
 		Footer: &Footer{
 			Text: "GitHub Notifier",
 		},
+	}
+
+	// Add author avatar if available
+	if authorName != "" && authorAvatarURL != "" {
+		embed.Author = &Author{
+			Name:    authorName,
+			IconURL: authorAvatarURL,
+		}
 	}
 
 	return d.SendMessage(&DiscordMessage{

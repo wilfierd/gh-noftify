@@ -47,7 +47,8 @@ type Review struct {
 }
 
 type User struct {
-	Login string `json:"login"`
+	Login     string `json:"login"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 type Notification struct {
@@ -295,6 +296,27 @@ func (c *Client) GetRecentCommits(repo string, since time.Time) ([]Commit, error
 	}
 
 	return commits, nil
+}
+
+func (c *Client) GetUserByUsername(username string) (*User, error) {
+	url := fmt.Sprintf("%s/users/%s", c.baseURL, username)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user %s: %w", username, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error: status %d", resp.StatusCode)
+	}
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode user: %w", err)
+	}
+
+	return &user, nil
 }
 
 func (c *Client) GetUserIssues(username string) ([]Issue, error) {

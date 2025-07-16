@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/wilfierd/gh-notify/github"
 	"github.com/wilfierd/gh-notify/notify"
 )
 
@@ -17,6 +18,7 @@ func main() {
 	commitURL := os.Getenv("COMMIT_URL")
 	repoURL := os.Getenv("REPO_URL")
 	discordWebhook := os.Getenv("DISCORD_WEBHOOK")
+	githubToken := os.Getenv("GITHUB_TOKEN")
 
 	if discordWebhook == "" {
 		log.Fatal("DISCORD_WEBHOOK environment variable is required")
@@ -25,8 +27,17 @@ func main() {
 	// Create Discord notifier
 	discordNotifier := notify.NewDiscordNotifier(discordWebhook)
 
+	// Get avatar URL if GitHub token is available
+	var avatarURL string
+	if githubToken != "" && author != "" {
+		client := github.NewClient(githubToken)
+		if user, err := client.GetUserByUsername(author); err == nil {
+			avatarURL = user.AvatarURL
+		}
+	}
+
 	// Format commit notification
-	discordMessage, err := notify.FormatCommitNotification(sha, commitMessage, author, repoName, commitURL, repoURL)
+	discordMessage, err := notify.FormatCommitNotification(sha, commitMessage, author, repoName, commitURL, repoURL, avatarURL)
 	if err != nil {
 		log.Fatalf("Failed to format commit notification: %v", err)
 	}

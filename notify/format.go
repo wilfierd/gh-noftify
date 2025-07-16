@@ -290,41 +290,49 @@ func getNotificationIcon(reason string) string {
 	}
 }
 
-func FormatCommitNotification(sha, message, author, repoName, commitURL, repoURL string) (*DiscordMessage, error) {
+func FormatCommitNotification(sha, message, author, repoName, commitURL, repoURL, avatarURL string) (*DiscordMessage, error) {
 	shortSHA := sha
 	if len(sha) > 7 {
 		shortSHA = sha[:7]
 	}
 
-	return &DiscordMessage{
-		Embeds: []Embed{
+	embed := Embed{
+		Title:       "📝 New Commit Pushed",
+		Description: fmt.Sprintf("Here's the latest commit from **%s**!", author),
+		Color:       ColorBlue,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Fields: []Field{
 			{
-				Title:       "📝 New Commit Pushed",
-				Description: fmt.Sprintf("Here's the latest commit from **%s**!", author),
-				Color:       ColorBlue,
-				Timestamp:   time.Now().Format(time.RFC3339),
-				Fields: []Field{
-					{
-						Name:   "🚀 Commit Details",
-						Value:  fmt.Sprintf("**[%s](%s)** %s", shortSHA, commitURL, message),
-						Inline: false,
-					},
-					{
-						Name:   "👤 Author",
-						Value:  author,
-						Inline: true,
-					},
-					{
-						Name:   "📂 Repository",
-						Value:  fmt.Sprintf("[%s](%s)", repoName, repoURL),
-						Inline: true,
-					},
-				},
-				Footer: &Footer{
-					Text: "GitHub Notifier • Commit Tracker",
-				},
+				Name:   "🚀 Commit Details",
+				Value:  fmt.Sprintf("**[%s](%s)** %s", shortSHA, commitURL, message),
+				Inline: false,
+			},
+			{
+				Name:   "👤 Author",
+				Value:  author,
+				Inline: true,
+			},
+			{
+				Name:   "📂 Repository",
+				Value:  fmt.Sprintf("[%s](%s)", repoName, repoURL),
+				Inline: true,
 			},
 		},
+		Footer: &Footer{
+			Text: "GitHub Notifier • Commit Tracker",
+		},
+	}
+
+	// Add author avatar if available
+	if avatarURL != "" {
+		embed.Author = &Author{
+			Name:    author,
+			IconURL: avatarURL,
+		}
+	}
+
+	return &DiscordMessage{
+		Embeds: []Embed{embed},
 	}, nil
 }
 
