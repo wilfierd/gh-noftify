@@ -5,8 +5,8 @@ on:
     - cron: '0 0 * * *'
     # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
     - cron: '0 14 * * *'
-    # Every 30 minutes for instant checks
-    - cron: '*/30 * * * *'
+    # Every 1 hour for instant checks
+    - cron: '0 * * * *'
   push:
     branches: [ main ]
     paths-ignore:
