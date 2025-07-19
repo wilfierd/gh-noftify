@@ -45,7 +45,7 @@ Your `GH_TOKEN` needs these scopes:
 |---------------|------------|------|-------------|
 | 7:00 AM | 0:00 UTC | Morning Digest | What needs your attention today |
 | 9:00 PM | 14:00 UTC | Evening Digest | Your accomplishments summary |
-| Every 30 min | Every 30 min | Instant Check | New alerts only |
+| Every 60 min | Every 60 min | Instant Check | New alerts only |
 
 ## Manual Usage
 
