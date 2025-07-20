@@ -199,17 +199,6 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check unread notifications - only NEW ones
-	var newUnreadNotifications []interface{}
-	for _, notif := range result.UnreadNotifications {
-		key := fmt.Sprintf("notification_%s", notif.ID)
-		if !state.IsNotificationSent(key, cooldownDuration) {
-			newUnreadNotifications = append(newUnreadNotifications, notif)
-			state.MarkNotificationSent(key)
-			hasNewAlerts = true
-		}
-	}
-
 	// Check repository invitations - only NEW ones
 	var newRepositoryInvitations []interface{}
 	for _, invitation := range result.RepositoryInvitations {
@@ -247,9 +236,6 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	for _, issue := range newAssignedIssues {
 		filteredResult.AssignedIssues = append(filteredResult.AssignedIssues, issue.(github.Issue))
 	}
-	for _, notif := range newUnreadNotifications {
-		filteredResult.UnreadNotifications = append(filteredResult.UnreadNotifications, notif.(github.Notification))
-	}
 	for _, invitation := range newRepositoryInvitations {
 		filteredResult.RepositoryInvitations = append(filteredResult.RepositoryInvitations, invitation.(github.Invitation))
 	}
@@ -264,7 +250,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		if err := discordNotifier.SendMessage(message); err != nil {
 			return false, fmt.Errorf("failed to send Discord message: %w", err)
 		}
-		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newUnreadNotifications) + len(newRepositoryInvitations)
+		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newRepositoryInvitations)
 		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", totalNewCount)
 	}
 

@@ -58,25 +58,6 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 		})
 	}
 
-	// Unread notifications
-	if len(result.UnreadNotifications) > 0 {
-		var notifList []string
-		for _, notif := range result.UnreadNotifications {
-			notifList = append(notifList, fmt.Sprintf("• %s: %s (%s)",
-				getNotificationIcon(notif.Reason), notif.Subject.Title, notif.Repository.Name))
-		}
-		// Show only first 5 to avoid spam
-		if len(notifList) > 5 {
-			notifList = notifList[:5]
-			notifList = append(notifList, fmt.Sprintf("... and %d more", len(result.UnreadNotifications)-5))
-		}
-		fields = append(fields, Field{
-			Name:   "📬 Unread notifications",
-			Value:  strings.Join(notifList, "\n"),
-			Inline: false,
-		})
-	}
-
 	// Failed workflows
 	if len(result.FailedWorkflows) > 0 {
 		var workflowList []string
@@ -95,7 +76,7 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 	if len(result.RepositoryInvitations) > 0 {
 		var inviteList []string
 		for _, invite := range result.RepositoryInvitations {
-			inviteList = append(inviteList, fmt.Sprintf("• 📨 **%s** invited you to [%s](%s)",
+			inviteList = append(inviteList, fmt.Sprintf("• **%s** invited you to [%s](%s)",
 				invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL))
 		}
 		fields = append(fields, Field{
