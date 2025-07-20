@@ -199,6 +199,28 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
+	// Check unread notifications - only NEW ones
+	var newUnreadNotifications []interface{}
+	for _, notif := range result.UnreadNotifications {
+		key := fmt.Sprintf("notification_%s", notif.ID)
+		if !state.IsNotificationSent(key, cooldownDuration) {
+			newUnreadNotifications = append(newUnreadNotifications, notif)
+			state.MarkNotificationSent(key)
+			hasNewAlerts = true
+		}
+	}
+
+	// Check repository invitations - only NEW ones
+	var newRepositoryInvitations []interface{}
+	for _, invitation := range result.RepositoryInvitations {
+		key := fmt.Sprintf("invitation_%d", invitation.ID)
+		if !state.IsNotificationSent(key, cooldownDuration) {
+			newRepositoryInvitations = append(newRepositoryInvitations, invitation)
+			state.MarkNotificationSent(key)
+			hasNewAlerts = true
+		}
+	}
+
 	// Only send notification if there are NEW alerts
 	if !hasNewAlerts {
 		fmt.Println("No new alerts found (all previously notified)")
@@ -206,8 +228,34 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	}
 
 	// Create filtered result with only new alerts
+	filteredResult := &github.CheckResult{
+		PRsNeedingReview:      []github.PullRequest{},
+		StaleOwnPRs:           []github.PullRequest{},
+		AssignedIssues:        []github.Issue{},
+		UnreadNotifications:   []github.Notification{},
+		RepositoryInvitations: []github.Invitation{},
+		FailedWorkflows:       []github.WorkflowRun{},
+	}
+
+	// Convert filtered items back to their original types
+	for _, pr := range newPRsNeedingReview {
+		filteredResult.PRsNeedingReview = append(filteredResult.PRsNeedingReview, pr.(github.PullRequest))
+	}
+	for _, pr := range newStaleOwnPRs {
+		filteredResult.StaleOwnPRs = append(filteredResult.StaleOwnPRs, pr.(github.PullRequest))
+	}
+	for _, issue := range newAssignedIssues {
+		filteredResult.AssignedIssues = append(filteredResult.AssignedIssues, issue.(github.Issue))
+	}
+	for _, notif := range newUnreadNotifications {
+		filteredResult.UnreadNotifications = append(filteredResult.UnreadNotifications, notif.(github.Notification))
+	}
+	for _, invitation := range newRepositoryInvitations {
+		filteredResult.RepositoryInvitations = append(filteredResult.RepositoryInvitations, invitation.(github.Invitation))
+	}
+
 	// Format and send alert message only for NEW items
-	message, err := notify.FormatInstantAlert(result) // You might need to modify this to accept filtered results
+	message, err := notify.FormatInstantAlert(filteredResult)
 	if err != nil {
 		return false, fmt.Errorf("failed to format alert: %w", err)
 	}
@@ -216,8 +264,8 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		if err := discordNotifier.SendMessage(message); err != nil {
 			return false, fmt.Errorf("failed to send Discord message: %w", err)
 		}
-		newCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues)
-		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", newCount)
+		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newUnreadNotifications) + len(newRepositoryInvitations)
+		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", totalNewCount)
 	}
 
 	return true, nil

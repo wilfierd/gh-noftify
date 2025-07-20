@@ -71,6 +71,15 @@ type Repo struct {
 	FullName string `json:"full_name"`
 }
 
+type Invitation struct {
+	ID         int       `json:"id"`
+	Repository Repo      `json:"repository"`
+	Invitee    User      `json:"invitee"`
+	Inviter    User      `json:"inviter"`
+	CreatedAt  time.Time `json:"created_at"`
+	HTMLURL    string    `json:"html_url"`
+}
+
 type WorkflowRun struct {
 	ID         int       `json:"id"`
 	Status     string    `json:"status"`
@@ -196,7 +205,7 @@ func (c *Client) GetAssignedIssues(username string) ([]Issue, error) {
 }
 
 func (c *Client) GetNotifications() ([]Notification, error) {
-	url := fmt.Sprintf("%s/notifications?all=false", c.baseURL)
+	url := fmt.Sprintf("%s/notifications?all=false&participating=false", c.baseURL)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
@@ -231,6 +240,27 @@ func (c *Client) GetNotifications() ([]Notification, error) {
 	}
 
 	return notifications, nil
+}
+
+func (c *Client) GetRepositoryInvitations() ([]Invitation, error) {
+	url := fmt.Sprintf("%s/user/repository_invitations", c.baseURL)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository invitations: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error: status %d", resp.StatusCode)
+	}
+
+	var invitations []Invitation
+	if err := json.NewDecoder(resp.Body).Decode(&invitations); err != nil {
+		return nil, fmt.Errorf("failed to decode invitations: %w", err)
+	}
+
+	return invitations, nil
 }
 
 func (c *Client) GetRecentWorkflowRuns(username string) ([]WorkflowRun, error) {

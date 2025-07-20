@@ -6,11 +6,12 @@ import (
 )
 
 type CheckResult struct {
-	PRsNeedingReview    []PullRequest
-	StaleOwnPRs         []PullRequest
-	AssignedIssues      []Issue
-	UnreadNotifications []Notification
-	FailedWorkflows     []WorkflowRun
+	PRsNeedingReview      []PullRequest
+	StaleOwnPRs           []PullRequest
+	AssignedIssues        []Issue
+	UnreadNotifications   []Notification
+	FailedWorkflows       []WorkflowRun
+	RepositoryInvitations []Invitation
 }
 
 type DailyDigest struct {
@@ -72,6 +73,15 @@ func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
 			result.UnreadNotifications = append(result.UnreadNotifications, notif)
 		}
 	}
+
+	// Get repository invitations
+	invitations, err := c.GetRepositoryInvitations()
+	if err != nil {
+		// Don't fail the whole check if invitations fail
+		fmt.Printf("Warning: failed to get repository invitations: %v\n", err)
+		invitations = []Invitation{}
+	}
+	result.RepositoryInvitations = invitations
 
 	// Get recent workflow failures
 	failedWorkflows, err := c.GetRecentWorkflowRuns(username)
@@ -160,7 +170,8 @@ func (r *CheckResult) HasAlerts() bool {
 		len(r.StaleOwnPRs) > 0 ||
 		len(r.AssignedIssues) > 0 ||
 		len(r.UnreadNotifications) > 0 ||
-		len(r.FailedWorkflows) > 0
+		len(r.FailedWorkflows) > 0 ||
+		len(r.RepositoryInvitations) > 0
 }
 
 func (r *CheckResult) GetAlertCount() int {
@@ -168,5 +179,6 @@ func (r *CheckResult) GetAlertCount() int {
 		len(r.StaleOwnPRs) +
 		len(r.AssignedIssues) +
 		len(r.UnreadNotifications) +
-		len(r.FailedWorkflows)
+		len(r.FailedWorkflows) +
+		len(r.RepositoryInvitations)
 }

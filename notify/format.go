@@ -91,6 +91,20 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 		})
 	}
 
+	// Repository invitations
+	if len(result.RepositoryInvitations) > 0 {
+		var inviteList []string
+		for _, invite := range result.RepositoryInvitations {
+			inviteList = append(inviteList, fmt.Sprintf("• 📨 **%s** invited you to [%s](%s)",
+				invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL))
+		}
+		fields = append(fields, Field{
+			Name:   "📨 Repository Invitations",
+			Value:  strings.Join(inviteList, "\n"),
+			Inline: false,
+		})
+	}
+
 	return &DiscordMessage{
 		Embeds: []Embed{
 			{
@@ -285,6 +299,20 @@ func getNotificationIcon(reason string) string {
 		return "📤"
 	case "ci_activity":
 		return "🔧"
+	case "invitation":
+		return "📩"
+	case "repository_invitation":
+		return "📨"
+	case "team_mention":
+		return "👥"
+	case "security_alert":
+		return "🚨"
+	case "state_change":
+		return "🔄"
+	case "subscribed":
+		return "🔔"
+	case "author":
+		return "✏️"
 	default:
 		return "🔔"
 	}
