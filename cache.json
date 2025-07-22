@@ -1,11 +1,9 @@
 {
   "last_check": "2025-07-21T16:32:46.586559025Z",
-  "last_daily_report": "2025-07-22T01:39:33.5096487Z",
+  "last_daily_report": "2025-07-22T14:18:22.070066879Z",
   "sent_notifications": {
-    "assigned_issue_1": "2025-07-15T08:51:15.786011258Z",
     "invitation_287366120": "2025-07-21T16:32:47.94391342Z",
-    "notification_17699901257": "2025-07-20T16:18:31.688304185Z",
-    "stale_pr_1": "2025-07-15T08:51:15.786009946Z"
+    "notification_17699901257": "2025-07-20T16:18:31.688304185Z"
   },
   "processed_prs": {},
   "processed_issues": {},
