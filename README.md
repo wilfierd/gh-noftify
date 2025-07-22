@@ -8,7 +8,7 @@ A lightweight GitHub Actions workflow that automatically sends Discord notificat
 
 ## ✨ Features
 
-- **Scheduled Digests**: Automatic morning (7:00 AM) and evening (9:00 PM) reports
+- **Scheduled Digests**: Automatic morning (8:00 AM) and evening (9:00 PM) reports
 - **Real-time Alerts**: Instant notifications every 1 hours for new GitHub activity
 - **Smart Filtering**: Prevents duplicate notifications with 24-hour cooldown
 - **Discord Integration**: Clean, formatted messages sent directly to your Discord channel
@@ -43,7 +43,7 @@ Your `GH_TOKEN` needs these scopes:
 
 | Time (Vietnam) | Time (UTC) | Type | Description |
 |---------------|------------|------|-------------|
-| 7:00 AM | 0:00 UTC | Morning Digest | What needs your attention today |
+| 8:00 AM | 0:00 UTC | Morning Digest | What needs your attention today |
 | 9:00 PM | 14:00 UTC | Evening Digest | Your accomplishments summary |
 | Every 60 min | Every 60 min | Instant Check | New alerts only |
 
