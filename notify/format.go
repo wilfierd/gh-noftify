@@ -72,18 +72,31 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 		})
 	}
 
-	// Repository invitations
+	// Repository invitations (only show NEW ones in instant alerts)
 	if len(result.RepositoryInvitations) > 0 {
 		var inviteList []string
 		for _, invite := range result.RepositoryInvitations {
-			inviteList = append(inviteList, fmt.Sprintf("• **%s** invited you to [%s](%s)",
-				invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL))
+			if !invite.IsExpired() {
+				daysLeft := invite.GetDaysUntilExpiration()
+				var expiryText string
+				if daysLeft == 0 {
+					expiryText = "expires today"
+				} else if daysLeft == 1 {
+					expiryText = "expires tomorrow"
+				} else {
+					expiryText = fmt.Sprintf("expires in %d days", daysLeft)
+				}
+				inviteList = append(inviteList, fmt.Sprintf("• **%s** to [%s](%s) (%s)",
+					invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL, expiryText))
+			}
 		}
-		fields = append(fields, Field{
-			Name:   "📨 Repository Invitations",
-			Value:  strings.Join(inviteList, "\n"),
-			Inline: false,
-		})
+		if len(inviteList) > 0 {
+			fields = append(fields, Field{
+				Name:   "📨 New Repository Invitations",
+				Value:  strings.Join(inviteList, "\n"),
+				Inline: false,
+			})
+		}
 	}
 
 	return &DiscordMessage{
@@ -227,10 +240,38 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 			hasWork = true
 		}
 
+		// Repository invitations (show in morning digest with expiration info)
+		if len(digest.RepositoryInvitations) > 0 {
+			var inviteList []string
+			for _, invite := range digest.RepositoryInvitations {
+				if !invite.IsExpired() {
+					daysLeft := invite.GetDaysUntilExpiration()
+					var expiryText string
+					if daysLeft == 0 {
+						expiryText = "expires today"
+					} else if daysLeft == 1 {
+						expiryText = "expires tomorrow"
+					} else {
+						expiryText = fmt.Sprintf("expires in %d days", daysLeft)
+					}
+					inviteList = append(inviteList, fmt.Sprintf("• **%s** to [%s](%s) (%s)",
+						invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL, expiryText))
+				}
+			}
+			if len(inviteList) > 0 {
+				fields = append(fields, Field{
+					Name:   "📨 Pending Repository Invitations",
+					Value:  strings.Join(inviteList, "\n"),
+					Inline: false,
+				})
+				hasWork = true
+			}
+		}
+
 		if !hasWork {
 			fields = append(fields, Field{
 				Name:   "✨ All clear!",
-				Value:  "No pending reviews or assigned issues",
+				Value:  "No pending reviews, assigned issues, or invitations",
 				Inline: false,
 			})
 		}

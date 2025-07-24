@@ -80,6 +80,26 @@ type Invitation struct {
 	HTMLURL    string    `json:"html_url"`
 }
 
+// GetExpirationDate calculates when the invitation expires (7 days from creation)
+func (inv *Invitation) GetExpirationDate() time.Time {
+	return inv.CreatedAt.AddDate(0, 0, 7) // GitHub repo invitations expire after 7 days
+}
+
+// GetDaysUntilExpiration returns how many days until the invitation expires
+func (inv *Invitation) GetDaysUntilExpiration() int {
+	expiration := inv.GetExpirationDate()
+	daysLeft := int(time.Until(expiration).Hours() / 24)
+	if daysLeft < 0 {
+		return 0 // Already expired
+	}
+	return daysLeft
+}
+
+// IsExpired checks if the invitation has expired
+func (inv *Invitation) IsExpired() bool {
+	return time.Now().After(inv.GetExpirationDate())
+}
+
 type WorkflowRun struct {
 	ID         int       `json:"id"`
 	Status     string    `json:"status"`

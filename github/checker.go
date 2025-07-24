@@ -15,17 +15,18 @@ type CheckResult struct {
 }
 
 type DailyDigest struct {
-	PRsOpened       []PullRequest
-	PRsMerged       []PullRequest
-	PRsReviewed     []PullRequest
-	IssuesOpened    []Issue
-	IssuesClosed    []Issue
-	CommitsToday    int
-	FailedWorkflows []WorkflowRun
-	PendingReviews  []PullRequest
-	AssignedIssues  []Issue
-	Date            time.Time
-	IsEvening       bool // true for evening digest, false for morning
+	PRsOpened             []PullRequest
+	PRsMerged             []PullRequest
+	PRsReviewed           []PullRequest
+	IssuesOpened          []Issue
+	IssuesClosed          []Issue
+	CommitsToday          int
+	FailedWorkflows       []WorkflowRun
+	PendingReviews        []PullRequest
+	AssignedIssues        []Issue
+	RepositoryInvitations []Invitation // Add invitations to daily digest
+	Date                  time.Time
+	IsEvening             bool // true for evening digest, false for morning
 }
 
 func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
@@ -160,6 +161,15 @@ func (c *Client) GenerateDailyDigest(username string) (*DailyDigest, error) {
 			return nil, fmt.Errorf("failed to get assigned issues: %w", err)
 		}
 		digest.AssignedIssues = assignedIssues
+
+		// Get repository invitations for morning digest
+		invitations, err := c.GetRepositoryInvitations()
+		if err != nil {
+			// Don't fail the whole digest if invitations fail
+			fmt.Printf("Warning: failed to get repository invitations for daily digest: %v\n", err)
+			invitations = []Invitation{}
+		}
+		digest.RepositoryInvitations = invitations
 	}
 
 	return digest, nil
