@@ -1,12 +1,13 @@
-name: GitHub Notifier
+name: GitHub Notifier (Unified)
+
 on:
   schedule:
     # 7:00 AM Vietnam = 0:00 UTC - Morning digest
     - cron: '0 0 * * *'
     # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
     - cron: '0 14 * * *'
-    # Every 1 hour for instant checks
-    - cron: '0 * * * *'
+    # Every 2 hours for instant checks (cost optimized)
+    - cron: '0 */2 * * *'
   push:
     branches: [ main ]
     paths-ignore:
@@ -24,10 +25,11 @@ on:
         - instant
         - morning
         - evening
-        - both
+        - commit
+        - all
 
 jobs:
-  notify:
+  unified-notifier:
     runs-on: ubuntu-latest
    
     steps:
@@ -43,25 +45,97 @@ jobs:
          
       - name: Download dependencies
         run: go mod download
+
+      # Determine what type of notification to run
+      - name: Determine notification type
+        id: determine_type
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "type=commit" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            case "${{ github.event.schedule }}" in
+              "0 0 * * *")
+                echo "type=morning" >> $GITHUB_OUTPUT
+                ;;
+              "0 14 * * *")
+                echo "type=evening" >> $GITHUB_OUTPUT
+                ;;
+              "0 */2 * * *")
+                echo "type=instant" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.check_type }}" >> $GITHUB_OUTPUT
+          else
+            echo "type=instant" >> $GITHUB_OUTPUT
+          fi
        
-      - name: Build application
-        run: go build -o gh-notify main.go
-       
-      - name: Run GitHub Notifier
-        run: ./gh-notify
+      # Run instant checks (scheduled every 2 hours or manual)
+      - name: Run instant checks
+        if: steps.determine_type.outputs.type == 'instant' || steps.determine_type.outputs.type == 'all'
+        run: |
+          go build -o gh-notify main.go
+          ./gh-notify
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GITHUB_USERNAME: ${{ github.actor }}
-          CHECK_TYPE: ${{ github.event.inputs.check_type || 'auto' }}
+          CHECK_TYPE: 'instant'
           CHECK_INTERVAL: '5m'
-          DAILY_REPORT_TIME: '02:00'
           CACHE_FILE: 'cache.json'
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
-          SCHEDULE_TYPE: ${{ github.event.schedule }}
+
+      # Run morning digest (scheduled at 7AM Vietnam or manual)
+      - name: Run morning digest
+        if: steps.determine_type.outputs.type == 'morning' || steps.determine_type.outputs.type == 'all'
+        run: |
+          go build -o gh-notify main.go
+          ./gh-notify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GITHUB_USERNAME: ${{ github.actor }}
+          CHECK_TYPE: 'morning'
+          CACHE_FILE: 'cache.json'
+          TIMEZONE: 'Asia/Ho_Chi_Minh'
+          GITHUB_ACTIONS: 'true'
+
+      # Run evening digest (scheduled at 9PM Vietnam or manual)
+      - name: Run evening digest
+        if: steps.determine_type.outputs.type == 'evening' || steps.determine_type.outputs.type == 'all'
+        run: |
+          go build -o gh-notify main.go
+          ./gh-notify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GITHUB_USERNAME: ${{ github.actor }}
+          CHECK_TYPE: 'evening'
+          CACHE_FILE: 'cache.json'
+          TIMEZONE: 'Asia/Ho_Chi_Minh'
+          GITHUB_ACTIONS: 'true'
+
+      # Run commit notification (triggered on push or manual)
+      - name: Run commit notification
+        if: steps.determine_type.outputs.type == 'commit' || steps.determine_type.outputs.type == 'all'
+        run: |
+          go build -o commit-notifier ./cmd/commit-notifier
+          ./commit-notifier
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'Manual trigger' }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name || github.actor }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          COMMIT_URL: ${{ github.event.head_commit.url || github.event.repository.html_url }}
+          REPO_URL: ${{ github.event.repository.html_url }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        continue-on-error: true
          
+      # Commit and push cache changes (only for non-commit notifications)
       - name: Commit and push cache changes
+        if: steps.determine_type.outputs.type != 'commit'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
