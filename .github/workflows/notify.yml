@@ -2,8 +2,8 @@ name: GitHub Notifier (Unified)
 
 on:
   schedule:
-    # 7:00 AM Vietnam = 0:00 UTC - Morning digest
-    - cron: '0 0 * * *'
+    # 7:00 AM Vietnam - Adjusted for GitHub Actions delay
+    - cron: '15 23 * * *'
     # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
     - cron: '0 14 * * *'
     # Every 2 hours for instant checks (cost optimized)
@@ -54,7 +54,7 @@ jobs:
             echo "type=commit" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             case "${{ github.event.schedule }}" in
-              "0 0 * * *")
+              "15 23 * * *")
                 echo "type=morning" >> $GITHUB_OUTPUT
                 ;;
               "0 14 * * *")
