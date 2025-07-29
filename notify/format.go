@@ -99,6 +99,11 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 		}
 	}
 
+	// Don't send empty notifications
+	if len(fields) == 0 {
+		return nil, nil
+	}
+
 	return &DiscordMessage{
 		Embeds: []Embed{
 			{

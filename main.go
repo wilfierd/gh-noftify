@@ -210,6 +210,28 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
+	// Check unread notifications - only NEW ones
+	var newUnreadNotifications []interface{}
+	for _, notification := range result.UnreadNotifications {
+		key := fmt.Sprintf("notification_%s", notification.ID)
+		if !state.IsNotificationSent(key, cooldownDuration) {
+			newUnreadNotifications = append(newUnreadNotifications, notification)
+			state.MarkNotificationSent(key)
+			hasNewAlerts = true
+		}
+	}
+
+	// Check failed workflows - only NEW ones
+	var newFailedWorkflows []interface{}
+	for _, workflow := range result.FailedWorkflows {
+		key := fmt.Sprintf("workflow_%d", workflow.ID)
+		if !state.IsNotificationSent(key, cooldownDuration) {
+			newFailedWorkflows = append(newFailedWorkflows, workflow)
+			state.MarkNotificationSent(key)
+			hasNewAlerts = true
+		}
+	}
+
 	// Only send notification if there are NEW alerts
 	if !hasNewAlerts {
 		fmt.Println("No new alerts found (all previously notified)")
@@ -239,6 +261,12 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	for _, invitation := range newRepositoryInvitations {
 		filteredResult.RepositoryInvitations = append(filteredResult.RepositoryInvitations, invitation.(github.Invitation))
 	}
+	for _, notification := range newUnreadNotifications {
+		filteredResult.UnreadNotifications = append(filteredResult.UnreadNotifications, notification.(github.Notification))
+	}
+	for _, workflow := range newFailedWorkflows {
+		filteredResult.FailedWorkflows = append(filteredResult.FailedWorkflows, workflow.(github.WorkflowRun))
+	}
 
 	// Format and send alert message only for NEW items
 	message, err := notify.FormatInstantAlert(filteredResult)
@@ -250,7 +278,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		if err := discordNotifier.SendMessage(message); err != nil {
 			return false, fmt.Errorf("failed to send Discord message: %w", err)
 		}
-		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newRepositoryInvitations)
+		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newRepositoryInvitations) + len(newUnreadNotifications) + len(newFailedWorkflows)
 		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", totalNewCount)
 	}
 
