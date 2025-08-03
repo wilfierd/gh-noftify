@@ -14,6 +14,7 @@ type Config struct {
 	DailyReportTime string
 	CacheFile       string
 	Timezone        string
+	TrackAllCommits bool // Enable tracking commits from all repositories
 }
 
 func Load() *Config {
@@ -27,6 +28,7 @@ func Load() *Config {
 		DailyReportTime: getEnvOrDefault("DAILY_REPORT_TIME", "02:00"), // 9h sáng VN = 2h UTC
 		CacheFile:       getEnvOrDefault("CACHE_FILE", "cache.json"),
 		Timezone:        getEnvOrDefault("TIMEZONE", "Asia/Ho_Chi_Minh"),
+		TrackAllCommits: GetBoolEnv("TRACK_ALL_COMMITS", true), // Default enabled
 	}
 }
 

@@ -20,7 +20,7 @@ type DailyDigest struct {
 	PRsReviewed           []PullRequest
 	IssuesOpened          []Issue
 	IssuesClosed          []Issue
-	CommitsToday          int
+	CommitsToday          []Commit // Changed from int to []Commit to include actual commits
 	FailedWorkflows       []WorkflowRun
 	PendingReviews        []PullRequest
 	AssignedIssues        []Issue
@@ -95,7 +95,7 @@ func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
 	return result, nil
 }
 
-func (c *Client) GenerateDailyDigest(username string) (*DailyDigest, error) {
+func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*DailyDigest, error) {
 	now := time.Now()
 
 	// Determine if this is evening digest (after 12 PM UTC = 7 PM Vietnam)
@@ -142,9 +142,18 @@ func (c *Client) GenerateDailyDigest(username string) (*DailyDigest, error) {
 			}
 		}
 
-		// Get commit count for today (simplified)
-		// This would require additional API calls to get accurate commit count
-		digest.CommitsToday = len(digest.PRsOpened) // Simplified estimation
+		// Get actual commits from all repositories for today (if enabled)
+		if trackAllCommits {
+			commits, err := c.GetRecentCommitsFromAllRepos(username, yesterday)
+			if err != nil {
+				fmt.Printf("Warning: failed to get commits from all repos: %v\n", err)
+				digest.CommitsToday = []Commit{} // Empty slice on error
+			} else {
+				digest.CommitsToday = commits
+			}
+		} else {
+			digest.CommitsToday = []Commit{} // Empty if feature disabled
+		}
 
 	} else {
 		// Morning digest: Show what needs attention today
@@ -170,6 +179,20 @@ func (c *Client) GenerateDailyDigest(username string) (*DailyDigest, error) {
 			invitations = []Invitation{}
 		}
 		digest.RepositoryInvitations = invitations
+
+		// Get recent commits for context (last 2 days for morning digest, if enabled)
+		if trackAllCommits {
+			twoDaysAgo := now.AddDate(0, 0, -2)
+			commits, err := c.GetRecentCommitsFromAllRepos(username, twoDaysAgo)
+			if err != nil {
+				fmt.Printf("Warning: failed to get commits from all repos for morning digest: %v\n", err)
+				digest.CommitsToday = []Commit{} // Empty slice on error
+			} else {
+				digest.CommitsToday = commits
+			}
+		} else {
+			digest.CommitsToday = []Commit{} // Empty if feature disabled
+		}
 	}
 
 	return digest, nil

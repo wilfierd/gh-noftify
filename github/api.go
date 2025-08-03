@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -69,6 +70,9 @@ type Subject struct {
 type Repo struct {
 	Name     string `json:"name"`
 	FullName string `json:"full_name"`
+	Private  bool   `json:"private"`
+	Fork     bool   `json:"fork"`
+	Archived bool   `json:"archived"`
 }
 
 type Invitation struct {
@@ -111,12 +115,13 @@ type WorkflowRun struct {
 }
 
 type Commit struct {
-	SHA       string    `json:"sha"`
-	Message   string    `json:"message"`
-	Author    User      `json:"author"`
-	Committer User      `json:"committer"`
-	Date      time.Time `json:"date"`
-	URL       string    `json:"html_url"`
+	SHA        string    `json:"sha"`
+	Message    string    `json:"message"`
+	Author     User      `json:"author"`
+	Committer  User      `json:"committer"`
+	Date       time.Time `json:"date"`
+	URL        string    `json:"html_url"`
+	Repository Repo      `json:"repository,omitempty"`
 }
 
 type CommitResponse struct {
@@ -342,6 +347,10 @@ func (c *Client) GetRecentCommits(repo string, since time.Time) ([]Commit, error
 			Author:  cr.Author,
 			Date:    cr.Commit.Author.Date,
 			URL:     cr.HTMLURL,
+			Repository: Repo{
+				FullName: repo,
+				Name:     repo[strings.LastIndex(repo, "/")+1:],
+			},
 		}
 	}
 
@@ -387,4 +396,61 @@ func (c *Client) GetUserIssues(username string) ([]Issue, error) {
 	}
 
 	return result.Items, nil
+}
+
+func (c *Client) GetUserRepositories(username string) ([]Repo, error) {
+	url := fmt.Sprintf("%s/users/%s/repos?type=all&sort=updated&per_page=100", c.baseURL, username)
+
+	resp, err := c.makeRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repositories: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error: status %d", resp.StatusCode)
+	}
+
+	var repos []Repo
+	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+		return nil, fmt.Errorf("failed to decode repositories: %w", err)
+	}
+
+	return repos, nil
+}
+
+func (c *Client) GetRecentCommitsFromAllRepos(username string, since time.Time) ([]Commit, error) {
+	// Get all user repositories
+	repos, err := c.GetUserRepositories(username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repositories: %w", err)
+	}
+
+	var allCommits []Commit
+
+	// Iterate through repositories and get recent commits
+	for _, repo := range repos {
+		// Skip archived and forked repositories to reduce noise
+		if repo.Archived || repo.Fork {
+			continue
+		}
+
+		commits, err := c.GetRecentCommits(repo.FullName, since)
+		if err != nil {
+			// Log error but continue with other repos
+			fmt.Printf("Warning: failed to get commits for repo %s: %v\n", repo.FullName, err)
+			continue
+		}
+
+		// Filter commits by the username to only include user's own commits
+		for _, commit := range commits {
+			if commit.Author.Login == username {
+				// Set repository information
+				commit.Repository = repo
+				allCommits = append(allCommits, commit)
+			}
+		}
+	}
+
+	return allCommits, nil
 }

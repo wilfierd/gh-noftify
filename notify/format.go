@@ -191,13 +191,36 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 			hasActivity = true
 		}
 
-		// Commit count
-		if digest.CommitsToday > 0 {
-			fields = append(fields, Field{
-				Name:   "💻 Activity",
-				Value:  fmt.Sprintf("%d commits/PRs today", digest.CommitsToday),
-				Inline: true,
-			})
+		// Commits today
+		if len(digest.CommitsToday) > 0 {
+			var commitList []string
+			for _, commit := range digest.CommitsToday {
+				// Truncate commit message if too long
+				message := commit.Message
+				if len(message) > 60 {
+					message = message[:60] + "..."
+				}
+				// Remove newlines from commit message
+				message = strings.ReplaceAll(message, "\n", " ")
+
+				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in **%s**\n  `%s`",
+					commit.SHA[:7], commit.URL, commit.Repository.Name, message))
+			}
+
+			// If too many commits, show first few and mention total
+			if len(commitList) > 5 {
+				fields = append(fields, Field{
+					Name:   fmt.Sprintf("💻 Recent Commits (%d total)", len(digest.CommitsToday)),
+					Value:  strings.Join(commitList[:5], "\n") + "\n" + fmt.Sprintf("... and %d more commits", len(commitList)-5),
+					Inline: false,
+				})
+			} else {
+				fields = append(fields, Field{
+					Name:   fmt.Sprintf("💻 Commits Today (%d)", len(digest.CommitsToday)),
+					Value:  strings.Join(commitList, "\n"),
+					Inline: false,
+				})
+			}
 			hasActivity = true
 		}
 
@@ -270,6 +293,38 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 					Inline: false,
 				})
 				hasWork = true
+			}
+		}
+
+		// Recent commits for context in morning digest
+		if len(digest.CommitsToday) > 0 {
+			var commitList []string
+			for _, commit := range digest.CommitsToday {
+				// Truncate commit message if too long
+				message := commit.Message
+				if len(message) > 50 {
+					message = message[:50] + "..."
+				}
+				// Remove newlines from commit message
+				message = strings.ReplaceAll(message, "\n", " ")
+
+				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in **%s**\n  `%s`",
+					commit.SHA[:7], commit.URL, commit.Repository.Name, message))
+			}
+
+			// Show recent activity for context
+			if len(commitList) > 3 {
+				fields = append(fields, Field{
+					Name:   fmt.Sprintf("📝 Recent Activity (%d commits)", len(digest.CommitsToday)),
+					Value:  strings.Join(commitList[:3], "\n") + "\n" + fmt.Sprintf("... and %d more recent commits", len(commitList)-3),
+					Inline: false,
+				})
+			} else {
+				fields = append(fields, Field{
+					Name:   fmt.Sprintf("📝 Recent Activity (%d commits)", len(digest.CommitsToday)),
+					Value:  strings.Join(commitList, "\n"),
+					Inline: false,
+				})
 			}
 		}
 

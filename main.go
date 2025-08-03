@@ -122,7 +122,7 @@ func main() {
 	// Run daily report (morning or evening)
 	if shouldRunDailyReport {
 		isEvening := shouldRunEveningDigest
-		if err := runDailyReport(githubClient, discordNotifier, state, username, isEvening); err != nil {
+		if err := runDailyReport(githubClient, discordNotifier, state, username, isEvening, cfg); err != nil {
 			log.Printf("Error running daily report: %v", err)
 			// Send error notification
 			errorMsg := notify.FormatErrorMessage(err)
@@ -285,15 +285,15 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	return true, nil
 }
 
-func runDailyReport(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string, isEvening bool) error {
+func runDailyReport(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string, isEvening bool, cfg *config.Config) error {
 	if isEvening {
 		fmt.Println("Running evening digest...")
 	} else {
 		fmt.Println("Running morning digest...")
 	}
 
-	// Generate daily digest with evening flag
-	digest, err := githubClient.GenerateDailyDigest(username)
+	// Generate daily digest with evening flag and commit tracking setting
+	digest, err := githubClient.GenerateDailyDigest(username, cfg.TrackAllCommits)
 	if err != nil {
 		return fmt.Errorf("failed to generate daily digest: %w", err)
 	}
