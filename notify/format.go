@@ -86,7 +86,7 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 				} else {
 					expiryText = fmt.Sprintf("expires in %d days", daysLeft)
 				}
-				inviteList = append(inviteList, fmt.Sprintf("• **%s** to [%s](%s) (%s)",
+				inviteList = append(inviteList, fmt.Sprintf("• %s to [%s](%s) (%s)",
 					invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL, expiryText))
 			}
 		}
@@ -203,7 +203,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 				// Remove newlines from commit message
 				message = strings.ReplaceAll(message, "\n", " ")
 
-				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in **%s**\n  `%s`",
+				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in %s\n  `%s`",
 					commit.SHA[:7], commit.URL, commit.Repository.Name, message))
 			}
 
@@ -282,7 +282,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 					} else {
 						expiryText = fmt.Sprintf("expires in %d days", daysLeft)
 					}
-					inviteList = append(inviteList, fmt.Sprintf("• **%s** to [%s](%s) (%s)",
+					inviteList = append(inviteList, fmt.Sprintf("• %s to [%s](%s) (%s)",
 						invite.Inviter.Login, invite.Repository.FullName, invite.HTMLURL, expiryText))
 				}
 			}
@@ -308,7 +308,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 				// Remove newlines from commit message
 				message = strings.ReplaceAll(message, "\n", " ")
 
-				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in **%s**\n  `%s`",
+				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in %s\n  `%s`",
 					commit.SHA[:7], commit.URL, commit.Repository.Name, message))
 			}
 

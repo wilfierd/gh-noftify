@@ -106,11 +106,11 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 		IsEvening: isEvening,
 	}
 
-	// Get time range for "today" (last 24 hours)
-	yesterday := now.AddDate(0, 0, -1)
-
 	if isEvening {
 		// Evening digest: Show what was accomplished today
+		// Get start of today (midnight) instead of last 24 hours
+		startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
 		// Get PRs opened today
 		ownPRs, err := c.GetUserPullRequests(username)
 		if err != nil {
@@ -118,11 +118,11 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 		}
 
 		for _, pr := range ownPRs {
-			if pr.CreatedAt.After(yesterday) {
+			if pr.CreatedAt.After(startOfToday) {
 				digest.PRsOpened = append(digest.PRsOpened, pr)
 			}
 			// Check if PR was merged today
-			if pr.State == "closed" && pr.UpdatedAt.After(yesterday) {
+			if pr.State == "closed" && pr.UpdatedAt.After(startOfToday) {
 				digest.PRsMerged = append(digest.PRsMerged, pr)
 			}
 		}
@@ -134,17 +134,17 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 		}
 
 		for _, issue := range issues {
-			if issue.CreatedAt.After(yesterday) {
+			if issue.CreatedAt.After(startOfToday) {
 				digest.IssuesOpened = append(digest.IssuesOpened, issue)
 			}
-			if issue.State == "closed" && issue.UpdatedAt.After(yesterday) {
+			if issue.State == "closed" && issue.UpdatedAt.After(startOfToday) {
 				digest.IssuesClosed = append(digest.IssuesClosed, issue)
 			}
 		}
 
 		// Get actual commits from all repositories for today (if enabled)
 		if trackAllCommits {
-			commits, err := c.GetRecentCommitsFromAllRepos(username, yesterday)
+			commits, err := c.GetRecentCommitsFromAllRepos(username, startOfToday)
 			if err != nil {
 				fmt.Printf("Warning: failed to get commits from all repos: %v\n", err)
 				digest.CommitsToday = []Commit{} // Empty slice on error
