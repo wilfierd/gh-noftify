@@ -367,39 +367,6 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 	}, nil
 }
 
-func getNotificationIcon(reason string) string {
-	switch reason {
-	case "review_requested":
-		return "👀"
-	case "mention":
-		return "💬"
-	case "assign":
-		return "📋"
-	case "comment":
-		return "💭"
-	case "push":
-		return "📤"
-	case "ci_activity":
-		return "🔧"
-	case "invitation":
-		return "📩"
-	case "repository_invitation":
-		return "📨"
-	case "team_mention":
-		return "👥"
-	case "security_alert":
-		return "🚨"
-	case "state_change":
-		return "🔄"
-	case "subscribed":
-		return "🔔"
-	case "author":
-		return "✏️"
-	default:
-		return "🔔"
-	}
-}
-
 func FormatCommitNotification(sha, message, author, repoName, commitURL, repoURL, avatarURL string) (*DiscordMessage, error) {
 	shortSHA := sha
 	if len(sha) > 7 {

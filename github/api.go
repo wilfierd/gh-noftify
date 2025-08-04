@@ -289,18 +289,83 @@ func (c *Client) GetRepositoryInvitations() ([]Invitation, error) {
 }
 
 func (c *Client) GetRecentWorkflowRuns(username string) ([]WorkflowRun, error) {
-	// This is a simplified version - in practice you'd need to iterate through repos
-	url := fmt.Sprintf("%s/search/issues?q=type:pr+author:%s+created:>%s",
-		c.baseURL, username, time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-
-	resp, err := c.makeRequest("GET", url, nil)
+	// Get user repositories first
+	repos, err := c.GetUserRepositories(username)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get recent activity: %w", err)
+		return nil, fmt.Errorf("failed to get user repositories: %w", err)
 	}
-	defer resp.Body.Close()
 
-	// This would need to be implemented properly with actual workflow API
-	return []WorkflowRun{}, nil
+	var allFailedWorkflows []WorkflowRun
+
+	// Check workflows for each repository (limit to avoid API rate limits)
+	maxRepos := 5 // Conservative limit to avoid rate limits
+	repoCount := 0
+
+	for _, repo := range repos {
+		if repoCount >= maxRepos {
+			break
+		}
+
+		// Skip archived, forked, and private repositories to reduce API calls
+		if repo.Archived || repo.Fork || repo.Private {
+			continue
+		}
+
+		repoCount++
+
+		// Get workflow runs for this repository (only failed ones, last 3 results)
+		url := fmt.Sprintf("%s/repos/%s/actions/runs?status=failure&per_page=3",
+			c.baseURL, repo.FullName)
+
+		resp, err := c.makeRequest("GET", url, nil)
+		if err != nil {
+			// Log warning but continue with other repos
+			fmt.Printf("Warning: failed to get workflow runs for %s: %v\n", repo.FullName, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			// Skip repos where we don't have access to workflows (404, 403)
+			continue
+		}
+
+		var workflowResponse struct {
+			WorkflowRuns []struct {
+				ID         int       `json:"id"`
+				Name       string    `json:"name"`
+				Status     string    `json:"status"`
+				Conclusion string    `json:"conclusion"`
+				CreatedAt  time.Time `json:"created_at"`
+				HTMLURL    string    `json:"html_url"`
+			} `json:"workflow_runs"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&workflowResponse); err != nil {
+			// Log warning but continue
+			fmt.Printf("Warning: failed to decode workflow runs for %s: %v\n", repo.FullName, err)
+			continue
+		}
+
+		// Convert to WorkflowRun format and filter recent failures
+		cutoff := time.Now().AddDate(0, 0, -3)
+		for _, run := range workflowResponse.WorkflowRuns {
+			if run.CreatedAt.After(cutoff) && run.Conclusion == "failure" {
+				workflowRun := WorkflowRun{
+					ID:         run.ID,
+					Name:       run.Name,
+					Status:     run.Status,
+					Conclusion: run.Conclusion,
+					CreatedAt:  run.CreatedAt,
+					HTMLURL:    run.HTMLURL,
+					Repository: repo,
+				}
+				allFailedWorkflows = append(allFailedWorkflows, workflowRun)
+			}
+		}
+	}
+
+	return allFailedWorkflows, nil
 }
 
 func (c *Client) GetUser() (*User, error) {

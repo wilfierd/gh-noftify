@@ -45,15 +45,6 @@ func LoadState(filepath string) (*State, error) {
 	if state.SentNotifications == nil {
 		state.SentNotifications = make(map[string]time.Time)
 	}
-	if state.ProcessedPRs == nil {
-		state.ProcessedPRs = make(map[string]bool)
-	}
-	if state.ProcessedIssues == nil {
-		state.ProcessedIssues = make(map[string]bool)
-	}
-	if state.ProcessedNotifs == nil {
-		state.ProcessedNotifs = make(map[string]bool)
-	}
 
 	return &state, nil
 }
@@ -80,29 +71,6 @@ func (s *State) IsNotificationSent(key string, cooldown time.Duration) bool {
 
 func (s *State) MarkNotificationSent(key string) {
 	s.SentNotifications[key] = time.Now()
-}
-
-func (s *State) IsProcessed(itemType, key string) bool {
-	switch itemType {
-	case "pr":
-		return s.ProcessedPRs[key]
-	case "issue":
-		return s.ProcessedIssues[key]
-	case "notification":
-		return s.ProcessedNotifs[key]
-	}
-	return false
-}
-
-func (s *State) MarkProcessed(itemType, key string) {
-	switch itemType {
-	case "pr":
-		s.ProcessedPRs[key] = true
-	case "issue":
-		s.ProcessedIssues[key] = true
-	case "notification":
-		s.ProcessedNotifs[key] = true
-	}
 }
 
 func (s *State) CleanupOldEntries(maxAge time.Duration) {
