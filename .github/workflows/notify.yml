@@ -132,16 +132,3 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         continue-on-error: true
-         
-      # Commit and push cache changes (only for non-commit notifications)
-      - name: Commit and push cache changes
-        if: steps.determine_type.outputs.type != 'commit'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add cache.json
-          git diff --staged --quiet || git commit -m "Update cache state [skip ci]"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        continue-on-error: true
