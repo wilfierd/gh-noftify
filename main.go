@@ -268,8 +268,14 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		filteredResult.FailedWorkflows = append(filteredResult.FailedWorkflows, workflow.(github.WorkflowRun))
 	}
 
+	// Get user avatar for consistent formatting
+	var avatarURL string
+	if user, err := githubClient.GetUser(); err == nil {
+		avatarURL = user.AvatarURL
+	}
+
 	// Format and send alert message only for NEW items
-	message, err := notify.FormatInstantAlert(filteredResult)
+	message, err := notify.FormatInstantAlert(filteredResult, username, avatarURL)
 	if err != nil {
 		return false, fmt.Errorf("failed to format alert: %w", err)
 	}
@@ -301,8 +307,14 @@ func runDailyReport(githubClient *github.Client, discordNotifier *notify.Discord
 	// Set the evening flag manually since we can't pass it through API
 	digest.IsEvening = isEvening
 
+	// Get user avatar for consistent formatting
+	var avatarURL string
+	if user, err := githubClient.GetUser(); err == nil {
+		avatarURL = user.AvatarURL
+	}
+
 	// Format and send daily digest
-	message, err := notify.FormatDailyDigest(digest, username)
+	message, err := notify.FormatDailyDigest(digest, username, avatarURL)
 	if err != nil {
 		return fmt.Errorf("failed to format daily digest: %w", err)
 	}

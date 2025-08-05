@@ -8,7 +8,7 @@ import (
 	"github.com/wilfierd/gh-notify/github"
 )
 
-func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
+func FormatInstantAlert(result *github.CheckResult, username string, avatarURL string) (*DiscordMessage, error) {
 	if !result.HasAlerts() {
 		return nil, nil
 	}
@@ -112,6 +112,10 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 				Color:       ColorOrange,
 				Timestamp:   time.Now().Format(time.RFC3339),
 				Fields:      fields,
+				Author: &Author{
+					Name:    username,
+					IconURL: avatarURL,
+				},
 				Footer: &Footer{
 					Text: "GitHub Notifier",
 				},
@@ -120,7 +124,7 @@ func FormatInstantAlert(result *github.CheckResult) (*DiscordMessage, error) {
 	}, nil
 }
 
-func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMessage, error) {
+func FormatDailyDigest(digest *github.DailyDigest, username string, avatarURL string) (*DiscordMessage, error) {
 	var fields []Field
 	dateStr := digest.Date.Format("2006-01-02")
 
@@ -131,7 +135,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 		// Evening Digest - Show accomplishments
 		title = fmt.Sprintf("🌆 Evening Summary – %s", dateStr)
 		description = fmt.Sprintf("Here's what you accomplished today, %s!", username)
-		color = 0x00FF00 // Green for accomplishments
+		color = ColorGreen // Green for accomplishments
 
 		hasActivity := false
 
@@ -203,7 +207,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 				// Remove newlines from commit message
 				message = strings.ReplaceAll(message, "\n", " ")
 
-				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in %s\n  `%s`",
+				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in %s\n  %s",
 					commit.SHA[:7], commit.URL, commit.Repository.Name, message))
 			}
 
@@ -236,7 +240,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 		// Morning Digest - Show what needs attention
 		title = fmt.Sprintf("🌅 Morning Briefing – %s", dateStr)
 		description = fmt.Sprintf("Good morning %s! Here's what needs your attention:", username)
-		color = 0xFFAA00 // Orange for attention needed
+		color = ColorOrange // Orange for attention needed
 
 		hasWork := false
 
@@ -308,7 +312,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 				// Remove newlines from commit message
 				message = strings.ReplaceAll(message, "\n", " ")
 
-				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in %s\n  `%s`",
+				commitList = append(commitList, fmt.Sprintf("• [%s](%s) in %s\n  %s",
 					commit.SHA[:7], commit.URL, commit.Repository.Name, message))
 			}
 
@@ -359,6 +363,10 @@ func FormatDailyDigest(digest *github.DailyDigest, username string) (*DiscordMes
 				Color:       color,
 				Timestamp:   time.Now().Format(time.RFC3339),
 				Fields:      fields,
+				Author: &Author{
+					Name:    username,
+					IconURL: avatarURL,
+				},
 				Footer: &Footer{
 					Text: "GitHub Notifier • Daily Report",
 				},
