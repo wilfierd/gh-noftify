@@ -41,34 +41,40 @@ Your `GH_TOKEN` needs these scopes:
 
 ## Schedule
 
-| Time (Vietnam) | Time (UTC) | Type | Description |
-|---------------|------------|------|-------------|
-| 7:00 AM | 0:00 UTC | Morning Digest | What needs your attention today |
-| 9:00 PM | 14:00 UTC | Evening Digest | Your accomplishments summary |
-| Every 120 min | Every 120 min | Instant Check | New alerts only |
+
+| Time (Vietnam, GMT+7) | Time (UTC) | Type | Description |
+|-----------------------|------------|------|-------------|
+| ~6:15–7:00 AM         | 23:15 UTC  | Morning Digest | What needs your attention today |
+| ~9:00–9:30 PM         | 14:00 UTC  | Evening Digest | Your accomplishments summary |
+| Every 2 hours         | Every 2 hours | Instant Check | New alerts only |
+
+**Note:**
+- The workflow is scheduled at `23:15 UTC` (6:15 AM Vietnam) for the morning digest and `14:00 UTC` (9:00 PM Vietnam) for the evening digest.
+- This is done to compensate for GitHub Actions' delay (5–30 minutes), so notifications arrive before 7:00 AM and 9:30 PM local time.
+- Actual notification time may vary slightly due to GitHub's scheduling lag.
 
 ## Manual Usage
 
 Run the workflow manually with different options:
 
 ### Check Types
-1. Go to `Actions` tab → `GitHub Notifier` → `Run workflow`
-2. Choose check type:
-   - **`instant`** - Check for new alerts only
-   - **`morning`** - Generate morning briefing (what needs attention)
-   - **`evening`** - Generate evening summary (accomplishments)  
-   - **`both`** - Run both instant and daily checks
+Go to the `Actions` tab → `GitHub Notifier` → `Run workflow` and choose a check type:
+
+- **`instant`** – Check for new alerts only
+- **`morning`** – Generate morning briefing (what needs attention)
+- **`evening`** – Generate evening summary (accomplishments)
+- **`commit`** – Send commit notification (on push)
+- **`all`** – Run all notification types (instant, morning, evening, commit)
 
 ## Configuration
 
 The workflow uses these environment variables:
 
 ```yaml
-CHECK_TYPE: 'both'                    # instant, morning, evening, or both
-CHECK_INTERVAL: '5m'                  # Time between checks
-DAILY_REPORT_TIME: '02:00'           # Daily report time (Vietnam timezone)
-CACHE_FILE: 'cache.json'             # Cache file location
-TIMEZONE: 'Asia/Ho_Chi_Minh'         # Timezone for reports
+CHECK_TYPE: 'instant' | 'morning' | 'evening' | 'commit' | 'all'  # Notification type
+CHECK_INTERVAL: '5m'                  # Time between instant checks
+DAILY_REPORT_TIME: '07:00'            # Morning report time (Vietnam timezone)
+TIMEZONE: 'Asia/Ho_Chi_Minh'          # Timezone for reports
 ```
 
 ## Development
