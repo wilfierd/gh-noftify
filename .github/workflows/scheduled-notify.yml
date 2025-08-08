@@ -1,4 +1,4 @@
-name: GitHub Notifier (Unified)
+name: Scheduled GitHub Notifier
 
 on:
   schedule:
@@ -8,12 +8,6 @@ on:
     - cron: '0 14 * * *'
     # Every 2 hours for instant checks (cost optimized)
     - cron: '0 */2 * * *'
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'cache.json'
-      - 'README.md'
-      - '*.md'
   workflow_dispatch:
     inputs:
       check_type:
@@ -25,11 +19,10 @@ on:
         - instant
         - morning
         - evening
-        - commit
         - all
 
 jobs:
-  unified-notifier:
+  scheduled-notifier:
     runs-on: ubuntu-latest
    
     steps:
@@ -50,9 +43,7 @@ jobs:
       - name: Determine notification type
         id: determine_type
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "type=commit" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ]; then
             case "${{ github.event.schedule }}" in
               "15 23 * * *")
                 echo "type=morning" >> $GITHUB_OUTPUT
@@ -115,20 +106,3 @@ jobs:
           CACHE_FILE: 'cache.json'
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
-
-      # Run commit notification (triggered on push or manual)
-      - name: Run commit notification
-        if: steps.determine_type.outputs.type == 'commit' || steps.determine_type.outputs.type == 'all'
-        run: |
-          go build -o commit-notifier ./cmd/commit-notifier
-          ./commit-notifier
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'Manual trigger' }}
-          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name || github.actor }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          COMMIT_URL: ${{ github.event.head_commit.url || github.event.repository.html_url }}
-          REPO_URL: ${{ github.event.repository.html_url }}
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        continue-on-error: true
