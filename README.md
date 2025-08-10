@@ -14,6 +14,7 @@ A lightweight GitHub Actions workflow that automatically sends Discord notificat
 - **Discord Integration**: Clean, formatted messages sent directly to your Discord channel
 - **Manual Control**: Run notifications on-demand with customizable check types
 - **Efficient Caching**: Minimal repository commits, only when necessary
+- **Commit tracking**: Inprocess.....
 
 ##  Quick Setup
 
