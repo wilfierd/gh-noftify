@@ -104,17 +104,13 @@ func main() {
 	fmt.Printf("Running GitHub Notifier for user: %s\n", username)
 	fmt.Printf("Daily report: %t, Instant check: %t\n", shouldRunDailyReport, shouldRunInstantCheck)
 
-	hasNewAlerts := false
-
 	// Run instant checks
 	if shouldRunInstantCheck {
-		if newAlertsFound, err := runInstantChecks(githubClient, discordNotifier, state, username); err != nil {
+		if _, err := runInstantChecks(githubClient, discordNotifier, state, username); err != nil {
 			log.Printf("Error running instant checks: %v", err)
 			// Send error notification
 			errorMsg := notify.FormatErrorMessage(err)
 			discordNotifier.SendSimpleMessage(errorMsg)
-		} else {
-			hasNewAlerts = newAlertsFound
 		}
 		state.LastCheck = now
 	}
@@ -134,8 +130,9 @@ func main() {
 	// Clean up old entries to keep cache size manageable
 	state.CleanupOldEntries(7 * 24 * time.Hour) // Keep 7 days of history
 
-	// Save state only if we had updates (new alerts or daily report)
-	shouldSaveCache := shouldRunInstantCheck && hasNewAlerts || shouldRunDailyReport
+	// Save state if we ran any checks (instant or daily report)
+	// We need to save even if no new alerts because we still update LastCheck time and mark notifications as processed
+	shouldSaveCache := shouldRunInstantCheck || shouldRunDailyReport
 	if shouldSaveCache {
 		if err := state.Save(cfg.CacheFile); err != nil {
 			log.Printf("Warning: Failed to save cache state: %v", err)

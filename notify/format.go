@@ -14,7 +14,13 @@ func FormatInstantAlert(result *github.CheckResult, username string, avatarURL s
 	}
 
 	var fields []Field
-	alertCount := result.GetAlertCount()
+	// Calculate actual count of items being shown (not using GetAlertCount as it may include old alerts)
+	alertCount := len(result.PRsNeedingReview) +
+		len(result.StaleOwnPRs) +
+		len(result.AssignedIssues) +
+		len(result.UnreadNotifications) +
+		len(result.FailedWorkflows) +
+		len(result.RepositoryInvitations)
 
 	// PRs needing review
 	if len(result.PRsNeedingReview) > 0 {
