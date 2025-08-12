@@ -70,9 +70,11 @@ func main() {
 	}
 
 	// Debug cache state
+	fmt.Printf("DEBUG: Cache file path = %s\n", cfg.CacheFile)
 	fmt.Printf("DEBUG: Last check time = %s\n", state.LastCheck.Format("2006-01-02 15:04:05"))
 	fmt.Printf("DEBUG: Last daily report = %s\n", state.LastDailyReport.Format("2006-01-02 15:04:05"))
 	fmt.Printf("DEBUG: Time since last check = %v\n", time.Since(state.LastCheck))
+	fmt.Printf("DEBUG: Number of cached notifications = %d\n", len(state.SentNotifications))
 
 	// Determine what to run based on check type
 	shouldRunMorningDigest := checkType == "morning" || checkType == "both"
@@ -134,10 +136,12 @@ func main() {
 	// We need to save even if no new alerts because we still update LastCheck time and mark notifications as processed
 	shouldSaveCache := shouldRunInstantCheck || shouldRunDailyReport
 	if shouldSaveCache {
+		fmt.Printf("DEBUG: Saving cache with %d notification entries to %s\n", len(state.SentNotifications), cfg.CacheFile)
 		if err := state.Save(cfg.CacheFile); err != nil {
 			log.Printf("Warning: Failed to save cache state: %v", err)
+		} else {
+			fmt.Println("Cache state updated successfully")
 		}
-		fmt.Println("Cache state updated")
 	} else {
 		fmt.Println("No cache updates needed")
 	}
@@ -163,13 +167,16 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	cooldownDuration := 24 * time.Hour // Only notify once per day per alert
 	hasNewAlerts := false
 
+	// Collect keys to mark as sent ONLY after successful Discord delivery
+	var keysToMark []string
+
 	// Check PR reviews - only NEW ones
 	var newPRsNeedingReview []interface{}
 	for _, pr := range result.PRsNeedingReview {
 		key := fmt.Sprintf("review_request_%d", pr.Number)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newPRsNeedingReview = append(newPRsNeedingReview, pr)
-			state.MarkNotificationSent(key)
+			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -180,7 +187,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		key := fmt.Sprintf("stale_pr_%d", pr.Number)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newStaleOwnPRs = append(newStaleOwnPRs, pr)
-			state.MarkNotificationSent(key)
+			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -191,7 +198,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		key := fmt.Sprintf("assigned_issue_%d", issue.Number)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newAssignedIssues = append(newAssignedIssues, issue)
-			state.MarkNotificationSent(key)
+			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -202,7 +209,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		key := fmt.Sprintf("invitation_%d", invitation.ID)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newRepositoryInvitations = append(newRepositoryInvitations, invitation)
-			state.MarkNotificationSent(key)
+			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -213,7 +220,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		key := fmt.Sprintf("notification_%s", notification.ID)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newUnreadNotifications = append(newUnreadNotifications, notification)
-			state.MarkNotificationSent(key)
+			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -224,7 +231,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		key := fmt.Sprintf("workflow_%d", workflow.ID)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newFailedWorkflows = append(newFailedWorkflows, workflow)
-			state.MarkNotificationSent(key)
+			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -281,8 +288,15 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		if err := discordNotifier.SendMessage(message); err != nil {
 			return false, fmt.Errorf("failed to send Discord message: %w", err)
 		}
+		
+		// Only mark notifications as sent AFTER successful Discord delivery
+		for _, key := range keysToMark {
+			state.MarkNotificationSent(key)
+		}
+		
 		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newRepositoryInvitations) + len(newUnreadNotifications) + len(newFailedWorkflows)
 		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", totalNewCount)
+		fmt.Printf("Marked %d keys as sent in cache\n", len(keysToMark))
 	}
 
 	return true, nil
