@@ -64,7 +64,12 @@ func (s *State) Save(filepath string) error {
 
 func (s *State) IsNotificationSent(key string, cooldown time.Duration) bool {
 	if lastSent, exists := s.SentNotifications[key]; exists {
-		return time.Since(lastSent) < cooldown
+		timeSince := time.Since(lastSent)
+		withinCooldown := timeSince < cooldown
+		// Debug logging for cooldown check
+		fmt.Printf("DEBUG: Cooldown check for '%s': last sent %.2f hours ago, cooldown %.2f hours, within cooldown: %t\n",
+			key, timeSince.Hours(), cooldown.Hours(), withinCooldown)
+		return withinCooldown
 	}
 	return false
 }

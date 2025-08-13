@@ -76,6 +76,13 @@ func main() {
 	fmt.Printf("DEBUG: Time since last check = %v\n", time.Since(state.LastCheck))
 	fmt.Printf("DEBUG: Number of cached notifications = %d\n", len(state.SentNotifications))
 
+	// Debug all cached notifications
+	fmt.Println("DEBUG: Current cached notifications:")
+	for key, timestamp := range state.SentNotifications {
+		hoursSince := time.Since(timestamp).Hours()
+		fmt.Printf("  - %s: %.2f hours ago\n", key, hoursSince)
+	}
+
 	// Determine what to run based on check type
 	shouldRunMorningDigest := checkType == "morning" || checkType == "both"
 	shouldRunEveningDigest := checkType == "evening" || checkType == "both"
@@ -165,6 +172,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 
 	// Filter for NEW alerts only - don't spam duplicates
 	cooldownDuration := 24 * time.Hour // Only notify once per day per alert
+	fmt.Printf("DEBUG: Using cooldown duration: %.2f hours\n", cooldownDuration.Hours())
 	hasNewAlerts := false
 
 	// Collect keys to mark as sent ONLY after successful Discord delivery
@@ -174,7 +182,14 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	var newPRsNeedingReview []interface{}
 	for _, pr := range result.PRsNeedingReview {
 		key := fmt.Sprintf("review_request_%d", pr.Number)
-		if !state.IsNotificationSent(key, cooldownDuration) {
+		isSent := state.IsNotificationSent(key, cooldownDuration)
+		timeSinceLastSent := "never"
+		if lastSent, exists := state.SentNotifications[key]; exists {
+			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
+		}
+		fmt.Printf("DEBUG: PR #%d - key: %s, already sent: %t, last sent: %s\n", pr.Number, key, isSent, timeSinceLastSent)
+
+		if !isSent {
 			newPRsNeedingReview = append(newPRsNeedingReview, pr)
 			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
@@ -185,7 +200,14 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	var newStaleOwnPRs []interface{}
 	for _, pr := range result.StaleOwnPRs {
 		key := fmt.Sprintf("stale_pr_%d", pr.Number)
-		if !state.IsNotificationSent(key, cooldownDuration) {
+		isSent := state.IsNotificationSent(key, cooldownDuration)
+		timeSinceLastSent := "never"
+		if lastSent, exists := state.SentNotifications[key]; exists {
+			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
+		}
+		fmt.Printf("DEBUG: Stale PR #%d - key: %s, already sent: %t, last sent: %s\n", pr.Number, key, isSent, timeSinceLastSent)
+
+		if !isSent {
 			newStaleOwnPRs = append(newStaleOwnPRs, pr)
 			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
@@ -196,7 +218,14 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	var newAssignedIssues []interface{}
 	for _, issue := range result.AssignedIssues {
 		key := fmt.Sprintf("assigned_issue_%d", issue.Number)
-		if !state.IsNotificationSent(key, cooldownDuration) {
+		isSent := state.IsNotificationSent(key, cooldownDuration)
+		timeSinceLastSent := "never"
+		if lastSent, exists := state.SentNotifications[key]; exists {
+			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
+		}
+		fmt.Printf("DEBUG: Assigned Issue #%d - key: %s, already sent: %t, last sent: %s\n", issue.Number, key, isSent, timeSinceLastSent)
+
+		if !isSent {
 			newAssignedIssues = append(newAssignedIssues, issue)
 			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
@@ -288,12 +317,14 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		if err := discordNotifier.SendMessage(message); err != nil {
 			return false, fmt.Errorf("failed to send Discord message: %w", err)
 		}
-		
+
 		// Only mark notifications as sent AFTER successful Discord delivery
+		fmt.Printf("DEBUG: Marking %d notifications as sent:\n", len(keysToMark))
 		for _, key := range keysToMark {
+			fmt.Printf("  - Marking as sent: %s\n", key)
 			state.MarkNotificationSent(key)
 		}
-		
+
 		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newRepositoryInvitations) + len(newUnreadNotifications) + len(newFailedWorkflows)
 		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", totalNewCount)
 		fmt.Printf("Marked %d keys as sent in cache\n", len(keysToMark))
