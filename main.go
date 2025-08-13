@@ -232,13 +232,16 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check repository invitations - only NEW ones
+	// Check repository invitations - only NEW and NON-EXPIRED ones
 	var newRepositoryInvitations []interface{}
 	for _, invitation := range result.RepositoryInvitations {
 		key := fmt.Sprintf("invitation_%d", invitation.ID)
 		if !state.IsNotificationSent(key, cooldownDuration) {
 			newRepositoryInvitations = append(newRepositoryInvitations, invitation)
-			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
+			// Only mark as sent if invitation is not expired (will actually be sent)
+			if !invitation.IsExpired() {
+				keysToMark = append(keysToMark, key)
+			}
 			hasNewAlerts = true
 		}
 	}
@@ -325,8 +328,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 			state.MarkNotificationSent(key)
 		}
 
-		totalNewCount := len(newPRsNeedingReview) + len(newStaleOwnPRs) + len(newAssignedIssues) + len(newRepositoryInvitations) + len(newUnreadNotifications) + len(newFailedWorkflows)
-		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates)\n", totalNewCount)
+		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates & expired invitations)\n", len(keysToMark))
 		fmt.Printf("Marked %d keys as sent in cache\n", len(keysToMark))
 	}
 
