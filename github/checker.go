@@ -180,10 +180,10 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 		}
 		digest.RepositoryInvitations = invitations
 
-		// Get recent commits for context (last 2 days for morning digest, if enabled)
+		// Get recent commits for context (previous day for morning digest, if enabled)
 		if trackAllCommits {
-			twoDaysAgo := now.AddDate(0, 0, -2)
-			commits, err := c.GetRecentCommitsFromAllRepos(username, twoDaysAgo)
+			oneDaysAgo := now.AddDate(0, 0, -1)
+			commits, err := c.GetRecentCommitsFromAllRepos(username, oneDaysAgo)
 			if err != nil {
 				fmt.Printf("Warning: failed to get commits from all repos for morning digest: %v\n", err)
 				digest.CommitsToday = []Commit{} // Empty slice on error
