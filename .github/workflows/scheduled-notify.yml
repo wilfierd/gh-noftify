@@ -3,7 +3,7 @@ name: Scheduled GitHub Notifier
 on:
   schedule:
     # 7:00 AM Vietnam - Adjusted for GitHub Actions delay
-    - cron: '18 20 * * *'
+    - cron: '41 2 * * *'
     # 9:00 PM Vietnam = 14:00 UTC - Evening digest  
     - cron: '0 14 * * *'
     # Every 2 hours for instant checks (cost optimized)
