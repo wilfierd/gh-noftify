@@ -280,7 +280,7 @@ func FormatDailyDigest(digest *github.DailyDigest, username string, avatarURL st
 				issueList = append(issueList, fmt.Sprintf("• [#%d %s](%s)", issue.Number, issue.Title, issue.HTMLURL))
 			}
 			fields = append(fields, Field{
-				Name:   "📝 Issues Assigned",
+				Name:   "📝 Issues Assigned to You",
 				Value:  strings.Join(issueList, "\n"),
 				Inline: false,
 			})

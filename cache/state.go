@@ -64,6 +64,12 @@ func (s *State) Save(filepath string) error {
 
 func (s *State) IsNotificationSent(key string, cooldown time.Duration) bool {
 	if lastSent, exists := s.SentNotifications[key]; exists {
+		// Special case: if cooldown is 0, just check if it was ever sent (for workflow failures)
+		if cooldown == 0 {
+			fmt.Printf("DEBUG: One-time check for '%s': was sent before, blocking repeat\n", key)
+			return true
+		}
+		
 		timeSince := time.Since(lastSent)
 		withinCooldown := timeSince < cooldown
 		// Debug logging for cooldown check

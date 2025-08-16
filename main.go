@@ -171,18 +171,19 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	}
 
 	// Filter for NEW alerts only - don't spam duplicates
-	cooldownDuration := 24 * time.Hour // Only notify once per day per alert
-	fmt.Printf("DEBUG: Using cooldown duration: %.2f hours\n", cooldownDuration.Hours())
+	// Different cooldown strategies for different alert types
+	standardCooldown := 24 * time.Hour // Standard 24-hour cooldown for most alerts
+	fmt.Printf("DEBUG: Using standard cooldown duration: %.2f hours\n", standardCooldown.Hours())
 	hasNewAlerts := false
 
 	// Collect keys to mark as sent ONLY after successful Discord delivery
 	var keysToMark []string
 
-	// Check PR reviews - only NEW ones
+	// Check PR reviews - only NEW ones (24-hour cooldown)
 	var newPRsNeedingReview []interface{}
 	for _, pr := range result.PRsNeedingReview {
 		key := fmt.Sprintf("review_request_%d", pr.Number)
-		isSent := state.IsNotificationSent(key, cooldownDuration)
+		isSent := state.IsNotificationSent(key, standardCooldown)
 		timeSinceLastSent := "never"
 		if lastSent, exists := state.SentNotifications[key]; exists {
 			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
@@ -196,11 +197,11 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check stale PRs - only NEW ones
+	// Check stale PRs - only NEW ones (24-hour cooldown)
 	var newStaleOwnPRs []interface{}
 	for _, pr := range result.StaleOwnPRs {
 		key := fmt.Sprintf("stale_pr_%d", pr.Number)
-		isSent := state.IsNotificationSent(key, cooldownDuration)
+		isSent := state.IsNotificationSent(key, standardCooldown)
 		timeSinceLastSent := "never"
 		if lastSent, exists := state.SentNotifications[key]; exists {
 			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
@@ -214,16 +215,18 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check assigned issues - only NEW ones
+	// Check assigned issues - SPECIAL HANDLING: Only send once as alert, then show in morning digest
 	var newAssignedIssues []interface{}
 	for _, issue := range result.AssignedIssues {
 		key := fmt.Sprintf("assigned_issue_%d", issue.Number)
-		isSent := state.IsNotificationSent(key, cooldownDuration)
+		// Use a very long cooldown (30 days) to effectively send only once
+		longCooldown := 30 * 24 * time.Hour
+		isSent := state.IsNotificationSent(key, longCooldown)
 		timeSinceLastSent := "never"
 		if lastSent, exists := state.SentNotifications[key]; exists {
 			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
 		}
-		fmt.Printf("DEBUG: Assigned Issue #%d - key: %s, already sent: %t, last sent: %s\n", issue.Number, key, isSent, timeSinceLastSent)
+		fmt.Printf("DEBUG: Assigned Issue #%d - key: %s, already sent: %t, last sent: %s (using long cooldown for assigned issues)\n", issue.Number, key, isSent, timeSinceLastSent)
 
 		if !isSent {
 			newAssignedIssues = append(newAssignedIssues, issue)
@@ -232,11 +235,11 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check repository invitations - only NEW and NON-EXPIRED ones
+	// Check repository invitations - only NEW and NON-EXPIRED ones (24-hour cooldown)
 	var newRepositoryInvitations []interface{}
 	for _, invitation := range result.RepositoryInvitations {
 		key := fmt.Sprintf("invitation_%d", invitation.ID)
-		if !state.IsNotificationSent(key, cooldownDuration) {
+		if !state.IsNotificationSent(key, standardCooldown) {
 			newRepositoryInvitations = append(newRepositoryInvitations, invitation)
 			// Only mark as sent if invitation is not expired (will actually be sent)
 			if !invitation.IsExpired() {
@@ -246,25 +249,29 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check unread notifications - only NEW ones
+	// Check unread notifications - only NEW ones (24-hour cooldown)
 	var newUnreadNotifications []interface{}
 	for _, notification := range result.UnreadNotifications {
 		key := fmt.Sprintf("notification_%s", notification.ID)
-		if !state.IsNotificationSent(key, cooldownDuration) {
+		if !state.IsNotificationSent(key, standardCooldown) {
 			newUnreadNotifications = append(newUnreadNotifications, notification)
 			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
 
-	// Check failed workflows - only NEW ones
+	// Check failed workflows - SPECIAL HANDLING: Send only once (no repeat sending)
 	var newFailedWorkflows []interface{}
 	for _, workflow := range result.FailedWorkflows {
 		key := fmt.Sprintf("workflow_%d", workflow.ID)
-		if !state.IsNotificationSent(key, cooldownDuration) {
+		// Check if we've already sent this workflow failure (no cooldown, but track to prevent repeats)
+		if !state.IsNotificationSent(key, 0) { // 0 duration means check if exists at all
+			fmt.Printf("DEBUG: Failed Workflow %d - sending once only\n", workflow.ID)
 			newFailedWorkflows = append(newFailedWorkflows, workflow)
-			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
+			keysToMark = append(keysToMark, key) // Mark as sent to prevent future sends
 			hasNewAlerts = true
+		} else {
+			fmt.Printf("DEBUG: Failed Workflow %d - already sent, skipping\n", workflow.ID)
 		}
 	}
 
