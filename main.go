@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -115,7 +116,7 @@ func main() {
 
 	// Run instant checks
 	if shouldRunInstantCheck {
-		if _, err := runInstantChecks(githubClient, discordNotifier, state, username); err != nil {
+		if _, err := runInstantChecks(githubClient, discordNotifier, state, username, cfg.CacheFile); err != nil {
 			log.Printf("Error running instant checks: %v", err)
 			// Send error notification
 			errorMsg := notify.FormatErrorMessage(err)
@@ -156,7 +157,7 @@ func main() {
 	fmt.Println("GitHub Notifier completed successfully")
 }
 
-func runInstantChecks(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string) (bool, error) {
+func runInstantChecks(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string, cacheFile string) (bool, error) {
 	fmt.Println("Running instant checks...")
 
 	// Get current alerts
@@ -215,7 +216,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check assigned issues - SPECIAL HANDLING: Only send once as alert, then show in morning digest
+	// Check assigned issues - SPECIAL HANDLING: Mark as sent IMMEDIATELY to prevent cache race condition
 	var newAssignedIssues []interface{}
 	for _, issue := range result.AssignedIssues {
 		key := fmt.Sprintf("assigned_issue_%d", issue.Number)
@@ -229,8 +230,18 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		fmt.Printf("DEBUG: Assigned Issue #%d - key: %s, already sent: %t, last sent: %s (using long cooldown for assigned issues)\n", issue.Number, key, isSent, timeSinceLastSent)
 
 		if !isSent {
+			// CRITICAL: Mark as sent IMMEDIATELY to prevent GitHub Actions cache race condition
+			state.MarkNotificationSent(key)
+			fmt.Printf("DEBUG: IMMEDIATELY marked assigned issue as sent to prevent race condition: %s\n", key)
+
+			// Save cache immediately to prevent race condition between workflow runs
+			if err := state.Save(cacheFile); err != nil {
+				fmt.Printf("WARNING: Failed to save cache immediately after marking assigned issue: %v\n", err)
+			} else {
+				fmt.Printf("DEBUG: Cache saved immediately after marking assigned issue\n")
+			}
+
 			newAssignedIssues = append(newAssignedIssues, issue)
-			keysToMark = append(keysToMark, key) // Don't mark yet, collect keys
 			hasNewAlerts = true
 		}
 	}
@@ -260,15 +271,24 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check failed workflows - SPECIAL HANDLING: Send only once (no repeat sending)
+	// Check failed workflows - SPECIAL HANDLING: Mark as sent IMMEDIATELY to prevent cache race condition
 	var newFailedWorkflows []interface{}
 	for _, workflow := range result.FailedWorkflows {
 		key := fmt.Sprintf("workflow_%d", workflow.ID)
 		// Check if we've already sent this workflow failure (no cooldown, but track to prevent repeats)
 		if !state.IsNotificationSent(key, 0) { // 0 duration means check if exists at all
-			fmt.Printf("DEBUG: Failed Workflow %d - sending once only\n", workflow.ID)
+			// CRITICAL: Mark as sent IMMEDIATELY to prevent GitHub Actions cache race condition
+			state.MarkNotificationSent(key)
+			fmt.Printf("DEBUG: IMMEDIATELY marked workflow failure as sent to prevent race condition: %s\n", key)
+
+			// Save cache immediately to prevent race condition between workflow runs
+			if err := state.Save(cacheFile); err != nil {
+				fmt.Printf("WARNING: Failed to save cache immediately after marking workflow failure: %v\n", err)
+			} else {
+				fmt.Printf("DEBUG: Cache saved immediately after marking workflow failure\n")
+			}
+
 			newFailedWorkflows = append(newFailedWorkflows, workflow)
-			keysToMark = append(keysToMark, key) // Mark as sent to prevent future sends
 			hasNewAlerts = true
 		} else {
 			fmt.Printf("DEBUG: Failed Workflow %d - already sent, skipping\n", workflow.ID)
@@ -329,14 +349,24 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 
 		// Only mark notifications as sent AFTER successful Discord delivery
-		fmt.Printf("DEBUG: Marking %d notifications as sent:\n", len(keysToMark))
+		// (Skip assigned issues and workflows as they were marked immediately to prevent race conditions)
+		remainingKeys := []string{}
 		for _, key := range keysToMark {
+			// Skip keys that were already marked immediately to prevent race conditions
+			if !strings.HasPrefix(key, "assigned_issue_") && !strings.HasPrefix(key, "workflow_") {
+				remainingKeys = append(remainingKeys, key)
+			}
+		}
+
+		fmt.Printf("DEBUG: Marking %d notifications as sent (excluding %d already marked):\n", len(remainingKeys), len(keysToMark)-len(remainingKeys))
+		for _, key := range remainingKeys {
 			fmt.Printf("  - Marking as sent: %s\n", key)
 			state.MarkNotificationSent(key)
 		}
 
-		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates & expired invitations)\n", len(keysToMark))
-		fmt.Printf("Marked %d keys as sent in cache\n", len(keysToMark))
+		totalMarked := len(remainingKeys) + (len(keysToMark) - len(remainingKeys))
+		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates & expired invitations)\n", totalMarked)
+		fmt.Printf("Marked %d keys as sent in cache\n", totalMarked)
 	}
 
 	return true, nil
