@@ -220,14 +220,13 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	var newAssignedIssues []interface{}
 	for _, issue := range result.AssignedIssues {
 		key := fmt.Sprintf("assigned_issue_%d", issue.Number)
-		// Use a very long cooldown (30 days) to effectively send only once
-		longCooldown := 30 * 24 * time.Hour
-		isSent := state.IsNotificationSent(key, longCooldown)
+		// Use zero cooldown to check if this issue was EVER sent before (send only once forever)
+		isSent := state.IsNotificationSent(key, 0) // 0 means check if exists at all
 		timeSinceLastSent := "never"
 		if lastSent, exists := state.SentNotifications[key]; exists {
 			timeSinceLastSent = fmt.Sprintf("%.2f hours ago", time.Since(lastSent).Hours())
 		}
-		fmt.Printf("DEBUG: Assigned Issue #%d - key: %s, already sent: %t, last sent: %s (using long cooldown for assigned issues)\n", issue.Number, key, isSent, timeSinceLastSent)
+		fmt.Printf("DEBUG: Assigned Issue #%d - key: %s, already sent: %t, last sent: %s (send once only)\n", issue.Number, key, isSent, timeSinceLastSent)
 
 		if !isSent {
 			// CRITICAL: Mark as sent IMMEDIATELY to prevent GitHub Actions cache race condition
@@ -331,6 +330,19 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		filteredResult.FailedWorkflows = append(filteredResult.FailedWorkflows, workflow.(github.WorkflowRun))
 	}
 
+	// Debug: Show what's in the filtered result
+	fmt.Printf("DEBUG: Filtered result contains:\n")
+	fmt.Printf("  - PRs needing review: %d\n", len(filteredResult.PRsNeedingReview))
+	fmt.Printf("  - Stale own PRs: %d\n", len(filteredResult.StaleOwnPRs))
+	fmt.Printf("  - Assigned issues: %d\n", len(filteredResult.AssignedIssues))
+	fmt.Printf("  - Unread notifications: %d\n", len(filteredResult.UnreadNotifications))
+	fmt.Printf("  - Failed workflows: %d\n", len(filteredResult.FailedWorkflows))
+	fmt.Printf("  - Repository invitations: %d\n", len(filteredResult.RepositoryInvitations))
+
+	for i, issue := range filteredResult.AssignedIssues {
+		fmt.Printf("    Assigned Issue %d: #%d - %s\n", i+1, issue.Number, issue.Title)
+	}
+
 	// Get user avatar for consistent formatting
 	var avatarURL string
 	if user, err := githubClient.GetUser(); err == nil {
@@ -364,9 +376,16 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 			state.MarkNotificationSent(key)
 		}
 
-		totalMarked := len(remainingKeys) + (len(keysToMark) - len(remainingKeys))
-		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates & expired invitations)\n", totalMarked)
-		fmt.Printf("Marked %d keys as sent in cache\n", totalMarked)
+		// Calculate actual count of items being sent to Discord
+		actualItemCount := len(filteredResult.PRsNeedingReview) +
+			len(filteredResult.StaleOwnPRs) +
+			len(filteredResult.AssignedIssues) +
+			len(filteredResult.UnreadNotifications) +
+			len(filteredResult.FailedWorkflows) +
+			len(filteredResult.RepositoryInvitations)
+
+		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates & expired invitations)\n", actualItemCount)
+		fmt.Printf("Marked %d keys as sent in cache (including %d marked immediately for race prevention)\n", len(keysToMark), len(keysToMark)-len(remainingKeys))
 	}
 
 	return true, nil
