@@ -407,6 +407,22 @@ func runDailyReport(githubClient *github.Client, discordNotifier *notify.Discord
 	// Set the evening flag manually since we can't pass it through API
 	digest.IsEvening = isEvening
 
+	// Debug: Show what's in the digest
+	fmt.Printf("DEBUG: Daily digest contains:\n")
+	fmt.Printf("  - PRs opened today: %d\n", len(digest.PRsOpened))
+	fmt.Printf("  - PRs merged today: %d\n", len(digest.PRsMerged))
+	fmt.Printf("  - Issues opened today: %d\n", len(digest.IssuesOpened))
+	fmt.Printf("  - Issues closed today: %d\n", len(digest.IssuesClosed))
+	fmt.Printf("  - Commits today: %d\n", len(digest.CommitsToday))
+	fmt.Printf("  - Failed workflows: %d\n", len(digest.FailedWorkflows))
+	fmt.Printf("  - Pending reviews: %d\n", len(digest.PendingReviews))
+	fmt.Printf("  - Assigned issues: %d\n", len(digest.AssignedIssues))
+	fmt.Printf("  - Repository invitations: %d\n", len(digest.RepositoryInvitations))
+	
+	for i, issue := range digest.AssignedIssues {
+		fmt.Printf("    Assigned Issue %d: #%d - %s (State: %s)\n", i+1, issue.Number, issue.Title, issue.State)
+	}
+
 	// Get user avatar for consistent formatting
 	var avatarURL string
 	if user, err := githubClient.GetUser(); err == nil {

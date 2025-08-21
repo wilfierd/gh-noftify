@@ -211,6 +211,7 @@ func (c *Client) GetReviewRequests(username string) ([]PullRequest, error) {
 
 func (c *Client) GetAssignedIssues(username string) ([]Issue, error) {
 	url := fmt.Sprintf("%s/search/issues?q=type:issue+assignee:%s+state:open", c.baseURL, username)
+	fmt.Printf("DEBUG: GetAssignedIssues API call: %s\n", url)
 
 	resp, err := c.makeRequest("GET", url, nil)
 	if err != nil {
@@ -224,6 +225,15 @@ func (c *Client) GetAssignedIssues(username string) ([]Issue, error) {
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	fmt.Printf("DEBUG: GetAssignedIssues returned %d issues\n", len(result.Items))
+	for i, issue := range result.Items {
+		assigneeInfo := "no assignee"
+		if issue.Assignee != nil {
+			assigneeInfo = fmt.Sprintf("assigned to %s", issue.Assignee.Login)
+		}
+		fmt.Printf("  Issue %d: #%d - %s (State: %s, %s)\n", i+1, issue.Number, issue.Title, issue.State, assigneeInfo)
 	}
 
 	return result.Items, nil

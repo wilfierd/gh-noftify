@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -99,7 +100,12 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 	now := time.Now()
 
 	// Determine if this is evening digest (after 12 PM UTC = 7 PM Vietnam)
+	// For manual testing, force morning mode when CHECK_TYPE=morning
 	isEvening := now.Hour() >= 12
+	if os.Getenv("CHECK_TYPE") == "morning" {
+		isEvening = false
+		fmt.Printf("DEBUG: Forced to morning mode for testing (CHECK_TYPE=morning)\n")
+	}
 
 	digest := &DailyDigest{
 		Date:      now,
