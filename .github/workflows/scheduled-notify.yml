@@ -32,17 +32,46 @@ jobs:
       # Get current date for cache key
       - name: Get date
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: |
+          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "Generated date: $(date +'%Y-%m-%d')"
+          echo "GitHub run ID: ${{ github.run_id }}"
       
       # Restore cache from previous runs (this prevents duplicate notifications)
       - name: Cache notification state
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: cache.json
-          # Use date-based cache key so all runs on the same day share cache
-          key: gh-notify-cache-${{ steps.date.outputs.date }}
+          # Use run_id for unique cache per run, but restore from nearest previous version
+          key: gh-notify-cache-${{ github.run_id }}
           restore-keys: |
+            gh-notify-cache-${{ steps.date.outputs.date }}-
             gh-notify-cache-
+      
+      # Debug: Show cache key information
+      - name: Show cache key information
+        run: |
+          echo "=== Cache key information ==="
+          echo "Primary key: gh-notify-cache-${{ github.run_id }}"
+          echo "Restore keys:"
+          echo "  - gh-notify-cache-${{ steps.date.outputs.date }}-"
+          echo "  - gh-notify-cache-"
+          echo "============================="
+      
+      # Debug: Show cache state after restoration
+      - name: Show cache state after restoration
+        run: |
+          echo "=== Cache state after restoration ==="
+          if [ -f cache.json ]; then
+            echo "Cache file exists:"
+            cat cache.json | jq . || cat cache.json
+            echo ""
+            echo "Cache file size: $(wc -c < cache.json) bytes"
+            echo "Cache file modified: $(stat -c %y cache.json)"
+          else
+            echo "No cache file found (fresh start)"
+          fi
+          echo "========================================"
        
       - name: Setup Go with cache
         uses: actions/setup-go@v5
@@ -121,3 +150,28 @@ jobs:
           CACHE_FILE: 'cache.json'
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
+
+      # Debug: Show final cache state
+      - name: Show final cache state
+        if: always()
+        run: |
+          echo "=== Final cache state ==="
+          if [ -f cache.json ]; then
+            echo "Final cache file:"
+            cat cache.json | jq . || cat cache.json
+            echo ""
+            echo "Cache file size: $(wc -c < cache.json) bytes"
+            echo "Cache file modified: $(stat -c %y cache.json)"
+          else
+            echo "No cache file found after execution"
+          fi
+          echo "=========================="
+
+      # Upload cache as artifact for debugging
+      - name: Upload cache artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-cache-${{ github.run_id }}
+          path: cache.json
+          retention-days: 7
