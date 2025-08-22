@@ -69,7 +69,7 @@ func (s *State) IsNotificationSent(key string, cooldown time.Duration) bool {
 			fmt.Printf("DEBUG: One-time check for '%s': was sent before, blocking repeat\n", key)
 			return true
 		}
-		
+
 		timeSince := time.Since(lastSent)
 		withinCooldown := timeSince < cooldown
 		// Debug logging for cooldown check
@@ -84,13 +84,17 @@ func (s *State) MarkNotificationSent(key string) {
 	s.SentNotifications[key] = time.Now()
 }
 
-func (s *State) CleanupOldEntries(maxAge time.Duration) {
+func (s *State) CleanupOldEntries(maxAge time.Duration) bool {
 	cutoff := time.Now().Add(-maxAge)
+	removedAny := false
 
 	// Clean up old notifications
 	for key, timestamp := range s.SentNotifications {
 		if timestamp.Before(cutoff) {
 			delete(s.SentNotifications, key)
+			removedAny = true
 		}
 	}
+
+	return removedAny
 }

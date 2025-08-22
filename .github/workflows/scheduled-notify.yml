@@ -174,4 +174,4 @@ jobs:
         with:
           name: notification-cache-${{ github.run_id }}
           path: cache.json
-          retention-days: 7
+          retention-days: 3

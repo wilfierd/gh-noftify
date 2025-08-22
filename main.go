@@ -114,15 +114,29 @@ func main() {
 	fmt.Printf("Running GitHub Notifier for user: %s\n", username)
 	fmt.Printf("Daily report: %t, Instant check: %t\n", shouldRunDailyReport, shouldRunInstantCheck)
 
+	// Track whether we made any changes that require saving the cache
+	hasChanges := false
+
 	// Run instant checks
+	var hasNewAlerts bool
 	if shouldRunInstantCheck {
-		if _, err := runInstantChecks(githubClient, discordNotifier, state, username, cfg.CacheFile); err != nil {
+		var err error
+		hasNewAlerts, err = runInstantChecks(githubClient, discordNotifier, state, username, cfg.CacheFile)
+		if err != nil {
 			log.Printf("Error running instant checks: %v", err)
 			// Send error notification
 			errorMsg := notify.FormatErrorMessage(err)
 			discordNotifier.SendSimpleMessage(errorMsg)
 		}
+
+		// Only update LastCheck and mark as changed if we actually ran the check
 		state.LastCheck = now
+		if hasNewAlerts {
+			hasChanges = true
+			fmt.Printf("DEBUG: Found new alerts, cache will be saved\n")
+		} else {
+			fmt.Printf("DEBUG: No new alerts found, LastCheck updated but no cache save needed\n")
+		}
 	}
 
 	// Run daily report (morning or evening)
@@ -134,16 +148,22 @@ func main() {
 			errorMsg := notify.FormatErrorMessage(err)
 			discordNotifier.SendSimpleMessage(errorMsg)
 		}
+
+		// Daily reports always update LastDailyReport, so we need to save
 		state.LastDailyReport = now
+		hasChanges = true
+		fmt.Printf("DEBUG: Daily report sent, cache will be saved\n")
 	}
 
 	// Clean up old entries to keep cache size manageable
-	state.CleanupOldEntries(7 * 24 * time.Hour) // Keep 7 days of history
+	cleanupRemovedEntries := state.CleanupOldEntries(7 * 24 * time.Hour) // Keep 7 days of history
+	if cleanupRemovedEntries {
+		hasChanges = true
+		fmt.Printf("DEBUG: Cleanup removed old entries, cache will be saved\n")
+	}
 
-	// Save state if we ran any checks (instant or daily report)
-	// We need to save even if no new alerts because we still update LastCheck time and mark notifications as processed
-	shouldSaveCache := shouldRunInstantCheck || shouldRunDailyReport
-	if shouldSaveCache {
+	// Only save state if there were actual changes
+	if hasChanges {
 		fmt.Printf("DEBUG: Saving cache with %d notification entries to %s\n", len(state.SentNotifications), cfg.CacheFile)
 		if err := state.Save(cfg.CacheFile); err != nil {
 			log.Printf("Warning: Failed to save cache state: %v", err)
@@ -151,7 +171,7 @@ func main() {
 			fmt.Println("Cache state updated successfully")
 		}
 	} else {
-		fmt.Println("No cache updates needed")
+		fmt.Println("No changes detected, cache save skipped")
 	}
 
 	fmt.Println("GitHub Notifier completed successfully")
@@ -418,7 +438,7 @@ func runDailyReport(githubClient *github.Client, discordNotifier *notify.Discord
 	fmt.Printf("  - Pending reviews: %d\n", len(digest.PendingReviews))
 	fmt.Printf("  - Assigned issues: %d\n", len(digest.AssignedIssues))
 	fmt.Printf("  - Repository invitations: %d\n", len(digest.RepositoryInvitations))
-	
+
 	for i, issue := range digest.AssignedIssues {
 		fmt.Printf("    Assigned Issue %d: #%d - %s (State: %s)\n", i+1, issue.Number, issue.Title, issue.State)
 	}
