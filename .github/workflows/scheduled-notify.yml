@@ -68,8 +68,12 @@ jobs:
             echo ""
             echo "Cache file size: $(wc -c < cache.json) bytes"
             echo "Cache file modified: $(stat -c %y cache.json)"
+            # Create backup for comparison (excluding timestamps)
+            cp cache.json cache.json.original
           else
             echo "No cache file found (fresh start)"
+            # Create empty original file for comparison
+            echo '{}' > cache.json.original
           fi
           echo "========================================"
        
@@ -151,19 +155,64 @@ jobs:
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
 
+      # Check if cache content actually changed and conditionally save
+      - name: Conditional cache save based on content changes
+        if: always()
+        run: |
+          echo "=== Checking for cache content changes ==="
+          
+          if [ -f cache.json ] && [ -f cache.json.original ]; then
+            # Compare cache content (ignoring pure timestamp differences)
+            # We'll check if the important content (notifications, PRs, issues) changed
+            
+            # Extract key content without last_check timestamp for comparison
+            if command -v jq > /dev/null; then
+              # Use jq to compare without last_check field
+              cat cache.json.original | jq 'del(.last_check)' > original_content.json 2>/dev/null || cp cache.json.original original_content.json
+              cat cache.json | jq 'del(.last_check)' > current_content.json 2>/dev/null || cp cache.json current_content.json
+            else
+              # Fallback: copy files as-is if jq not available
+              cp cache.json.original original_content.json
+              cp cache.json current_content.json
+            fi
+            
+            if cmp -s original_content.json current_content.json; then
+              echo "=== NO MEANINGFUL CONTENT CHANGES ==="
+              echo "Cache content is essentially the same (only timestamps changed)"
+              echo "Removing cache.json to prevent unnecessary cache save"
+              rm -f cache.json
+              echo "Cache file removed - GitHub Actions will not save a new cache entry"
+            else
+              echo "=== CONTENT CHANGES DETECTED ==="
+              echo "Cache has meaningful changes and will be saved"
+              echo "Original content size: $(wc -c < original_content.json) bytes"
+              echo "New content size: $(wc -c < current_content.json) bytes"
+            fi
+            
+            # Cleanup temp files
+            rm -f original_content.json current_content.json
+          elif [ -f cache.json ]; then
+            echo "=== NEW CACHE FILE ==="
+            echo "Cache file exists but no original to compare - will save new cache"
+          else
+            echo "=== NO CACHE FILE ==="
+            echo "No cache file generated - nothing to save"
+          fi
+          echo "============================================"
+
       # Debug: Show final cache state
       - name: Show final cache state
         if: always()
         run: |
           echo "=== Final cache state ==="
           if [ -f cache.json ]; then
-            echo "Final cache file:"
+            echo "Final cache file (will be saved by GitHub Actions):"
             cat cache.json | jq . || cat cache.json
             echo ""
             echo "Cache file size: $(wc -c < cache.json) bytes"
             echo "Cache file modified: $(stat -c %y cache.json)"
           else
-            echo "No cache file found after execution"
+            echo "No cache file found - GitHub Actions will not save cache"
           fi
           echo "=========================="
 

@@ -129,13 +129,13 @@ func main() {
 			discordNotifier.SendSimpleMessage(errorMsg)
 		}
 
-		// Only update LastCheck and mark as changed if we actually ran the check
-		state.LastCheck = now
+		// Only update LastCheck if we found new alerts (to avoid unnecessary cache changes)
 		if hasNewAlerts {
+			state.LastCheck = now
 			hasChanges = true
-			fmt.Printf("DEBUG: Found new alerts, cache will be saved\n")
+			fmt.Printf("DEBUG: Found new alerts, LastCheck updated and cache will be saved\n")
 		} else {
-			fmt.Printf("DEBUG: No new alerts found, LastCheck updated but no cache save needed\n")
+			fmt.Printf("DEBUG: No new alerts found, LastCheck NOT updated to avoid cache changes\n")
 		}
 	}
 
