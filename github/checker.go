@@ -13,6 +13,7 @@ type CheckResult struct {
 	UnreadNotifications   []Notification
 	FailedWorkflows       []WorkflowRun
 	RepositoryInvitations []Invitation
+	RecentCommits         []Commit // New field for real-time commit tracking
 }
 
 type DailyDigest struct {
@@ -31,6 +32,11 @@ type DailyDigest struct {
 }
 
 func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
+	return c.CheckForAlertsWithCommits(username, false, nil, 0)
+}
+
+// CheckForAlertsWithCommits includes optional commit tracking based on configuration
+func (c *Client) CheckForAlertsWithCommits(username string, trackCommits bool, trackedRepos []string, lookbackMinutes int) (*CheckResult, error) {
 	result := &CheckResult{}
 
 	// Get PRs that need review
@@ -92,6 +98,22 @@ func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
 		fmt.Printf("Warning: failed to get workflow runs: %v\n", err)
 	}
 	result.FailedWorkflows = failedWorkflows
+
+	// Get recent commits if tracking is enabled
+	if trackCommits && lookbackMinutes > 0 {
+		since := time.Now().Add(-time.Duration(lookbackMinutes) * time.Minute)
+		fmt.Printf("DEBUG: Checking for commits since %s (last %d minutes)\n", since.Format(time.RFC3339), lookbackMinutes)
+		
+		recentCommits, err := c.GetRecentCommitsFromSelectedRepos(username, since, trackedRepos)
+		if err != nil {
+			// Don't fail the whole check if commit fetching fails
+			fmt.Printf("Warning: failed to get recent commits: %v\n", err)
+			recentCommits = []Commit{}
+		}
+		
+		fmt.Printf("DEBUG: Found %d recent commits\n", len(recentCommits))
+		result.RecentCommits = recentCommits
+	}
 
 	return result, nil
 }
@@ -210,7 +232,8 @@ func (r *CheckResult) HasAlerts() bool {
 		len(r.AssignedIssues) > 0 ||
 		len(r.UnreadNotifications) > 0 ||
 		len(r.FailedWorkflows) > 0 ||
-		len(r.RepositoryInvitations) > 0
+		len(r.RepositoryInvitations) > 0 ||
+		len(r.RecentCommits) > 0
 }
 
 func (r *CheckResult) GetAlertCount() int {
@@ -219,5 +242,6 @@ func (r *CheckResult) GetAlertCount() int {
 		len(r.AssignedIssues) +
 		len(r.UnreadNotifications) +
 		len(r.FailedWorkflows) +
-		len(r.RepositoryInvitations)
+		len(r.RepositoryInvitations) +
+		len(r.RecentCommits)
 }

@@ -124,6 +124,9 @@ jobs:
           CACHE_FILE: 'cache.json'
           TIMEZONE: 'Asia/Ho_Chi_Minh'
           GITHUB_ACTIONS: 'true'
+          TRACK_COMMITS_REALTIME: ${{ vars.TRACK_COMMITS_REALTIME || 'false' }}
+          COMMIT_LOOKBACK_MINUTES: ${{ vars.COMMIT_LOOKBACK_MINUTES || '120' }}
+          TRACKED_REPOSITORIES: ${{ vars.TRACKED_REPOSITORIES || '' }}
 
       # Run morning digest (scheduled at 7AM Vietnam or manual)
       - name: Run morning digest

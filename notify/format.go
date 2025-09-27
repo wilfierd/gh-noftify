@@ -29,7 +29,8 @@ func FormatInstantAlert(result *github.CheckResult, username string, avatarURL s
 		len(result.AssignedIssues) +
 		len(result.UnreadNotifications) +
 		len(result.FailedWorkflows) +
-		nonExpiredInvitationsCount
+		nonExpiredInvitationsCount +
+		len(result.RecentCommits)
 
 	// PRs needing review
 	if len(result.PRsNeedingReview) > 0 {
@@ -112,6 +113,32 @@ func FormatInstantAlert(result *github.CheckResult, username string, avatarURL s
 				Inline: false,
 			})
 		}
+	}
+
+	// Recent commits (only show if tracking is enabled)
+	if len(result.RecentCommits) > 0 {
+		var commitList []string
+		for i, commit := range result.RecentCommits {
+			if i >= 10 { // Limit to 10 commits to avoid too long messages
+				commitList = append(commitList, fmt.Sprintf("... and %d more commits", len(result.RecentCommits)-10))
+				break
+			}
+			// Truncate commit message if too long
+			message := commit.Message
+			if len(message) > 50 {
+				message = message[:50] + "..."
+			}
+			// Remove newlines from commit message
+			message = strings.ReplaceAll(message, "\n", " ")
+			
+			commitList = append(commitList, fmt.Sprintf("• [%s](%s) in **%s**\n  `%s`",
+				commit.SHA[:7], commit.URL, commit.Repository.Name, message))
+		}
+		fields = append(fields, Field{
+			Name:   "💻 Recent Commits",
+			Value:  strings.Join(commitList, "\n"),
+			Inline: false,
+		})
 	}
 
 	// Don't send empty notifications

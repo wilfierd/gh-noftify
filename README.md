@@ -14,7 +14,7 @@ A lightweight GitHub Actions workflow that automatically sends Discord notificat
 - **Discord Integration**: Clean, formatted messages sent directly to your Discord channel
 - **Manual Control**: Run notifications on-demand with customizable check types
 - **Efficient Caching**: Minimal repository commits, only when necessary
-- **Commit tracking**: Inprocess.....
+- **Multi-Repository Commit Tracking**: Monitor commits across all your repos or selected ones
 
 ##  Quick Setup
 
@@ -74,8 +74,11 @@ The workflow uses these environment variables:
 ```yaml
 CHECK_TYPE: 'instant' | 'morning' | 'evening' | 'commit' | 'all'  # Notification type
 CHECK_INTERVAL: '5m'                  # Time between instant checks
-DAILY_REPORT_TIME: '07:00'            # Morning report time (Vietnam timezone)
+DAILY_REPORT_TIME: '07:00'            # Morning report time (Vietnam timezone) 
 TIMEZONE: 'Asia/Ho_Chi_Minh'          # Timezone for reports
+TRACK_COMMITS_REALTIME: 'false'       # Enable real-time commit notifications
+COMMIT_LOOKBACK_MINUTES: '120'        # How far back to check for commits
+TRACKED_REPOSITORIES: ''              # Comma-separated repos or empty for all
 ```
 
 ## Development

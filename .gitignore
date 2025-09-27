@@ -48,3 +48,4 @@ test-env.sh
 # Temporary files
 tmp/
 temp/
+WARP.md

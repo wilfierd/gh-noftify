@@ -529,3 +529,73 @@ func (c *Client) GetRecentCommitsFromAllRepos(username string, since time.Time) 
 
 	return allCommits, nil
 }
+
+// GetRecentCommitsFromSelectedRepos gets recent commits from specific repositories or all repos
+func (c *Client) GetRecentCommitsFromSelectedRepos(username string, since time.Time, selectedRepos []string) ([]Commit, error) {
+	var allCommits []Commit
+	var repos []Repo
+
+	if len(selectedRepos) > 0 {
+		// Get specific repositories
+		for _, repoName := range selectedRepos {
+			// Handle both "repo" and "owner/repo" formats
+			if !strings.Contains(repoName, "/") {
+				repoName = fmt.Sprintf("%s/%s", username, repoName)
+			}
+			
+			// Get repository info
+			url := fmt.Sprintf("%s/repos/%s", c.baseURL, repoName)
+			resp, err := c.makeRequest("GET", url, nil)
+			if err != nil {
+				fmt.Printf("Warning: failed to get repo %s: %v\n", repoName, err)
+				continue
+			}
+			defer resp.Body.Close()
+			
+			if resp.StatusCode == http.StatusNotFound {
+				fmt.Printf("Warning: repository %s not found\n", repoName)
+				continue
+			}
+			
+			var repo Repo
+			if err := json.NewDecoder(resp.Body).Decode(&repo); err != nil {
+				fmt.Printf("Warning: failed to decode repo %s: %v\n", repoName, err)
+				continue
+			}
+			repos = append(repos, repo)
+		}
+	} else {
+		// Get all user repositories
+		var err error
+		repos, err = c.GetUserRepositories(username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user repositories: %w", err)
+		}
+	}
+
+	// Iterate through repositories and get recent commits
+	for _, repo := range repos {
+		// Skip archived and forked repositories to reduce noise
+		if repo.Archived || repo.Fork {
+			continue
+		}
+
+		commits, err := c.GetRecentCommits(repo.FullName, since)
+		if err != nil {
+			// Log error but continue with other repos
+			fmt.Printf("Warning: failed to get commits for repo %s: %v\n", repo.FullName, err)
+			continue
+		}
+
+		// Filter commits by the username to only include user's own commits
+		for _, commit := range commits {
+			if commit.Author.Login == username {
+				// Set repository information
+				commit.Repository = repo
+				allCommits = append(allCommits, commit)
+			}
+		}
+	}
+
+	return allCommits, nil
+}
