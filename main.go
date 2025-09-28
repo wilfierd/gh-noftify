@@ -180,13 +180,8 @@ func main() {
 func runInstantChecks(githubClient *github.Client, discordNotifier *notify.DiscordNotifier, state *cache.State, username string, cfg *config.Config) (bool, error) {
 	fmt.Println("Running instant checks...")
 
-	// Get current alerts with optional commit tracking
-	result, err := githubClient.CheckForAlertsWithCommits(
-		username, 
-		cfg.TrackCommitsRealtime,
-		cfg.TrackedRepositories,
-		cfg.CommitLookbackMinutes,
-	)
+	// Get current alerts (no commit tracking - handled by real-time action)
+	result, err := githubClient.CheckForAlerts(username)
 	if err != nil {
 		return false, fmt.Errorf("failed to check for alerts: %w", err)
 	}
@@ -319,23 +314,8 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		}
 	}
 
-	// Check recent commits - only if tracking is enabled
-	var newCommits []interface{}
-	if cfg.TrackCommitsRealtime && len(result.RecentCommits) > 0 {
-		fmt.Printf("DEBUG: Checking %d recent commits for duplicates\n", len(result.RecentCommits))
-		for _, commit := range result.RecentCommits {
-			key := fmt.Sprintf("commit_%s", commit.SHA)
-			// Use 24-hour cooldown for commits to avoid spam
-			if !state.IsNotificationSent(key, standardCooldown) {
-				newCommits = append(newCommits, commit)
-				keysToMark = append(keysToMark, key)
-				hasNewAlerts = true
-				fmt.Printf("DEBUG: New commit to notify: %s in %s\n", commit.SHA[:7], commit.Repository.Name)
-			} else {
-				fmt.Printf("DEBUG: Commit %s already notified, skipping\n", commit.SHA[:7])
-			}
-		}
-	}
+	// Commit tracking is now handled by real-time GitHub Actions
+	// No need to check for commits in scheduled runs
 
 	// Only send notification if there are NEW alerts
 	if !hasNewAlerts {
@@ -351,7 +331,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 		UnreadNotifications:   []github.Notification{},
 		RepositoryInvitations: []github.Invitation{},
 		FailedWorkflows:       []github.WorkflowRun{},
-		RecentCommits:         []github.Commit{},
+		// RecentCommits removed - handled by real-time action
 	}
 
 	// Convert filtered items back to their original types
@@ -373,9 +353,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	for _, workflow := range newFailedWorkflows {
 		filteredResult.FailedWorkflows = append(filteredResult.FailedWorkflows, workflow.(github.WorkflowRun))
 	}
-	for _, commit := range newCommits {
-		filteredResult.RecentCommits = append(filteredResult.RecentCommits, commit.(github.Commit))
-	}
+	// Commit processing removed - handled by real-time GitHub Action
 
 	// Debug: Show what's in the filtered result
 	fmt.Printf("DEBUG: Filtered result contains:\n")
@@ -385,7 +363,7 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 	fmt.Printf("  - Unread notifications: %d\n", len(filteredResult.UnreadNotifications))
 	fmt.Printf("  - Failed workflows: %d\n", len(filteredResult.FailedWorkflows))
 	fmt.Printf("  - Repository invitations: %d\n", len(filteredResult.RepositoryInvitations))
-	fmt.Printf("  - Recent commits: %d\n", len(filteredResult.RecentCommits))
+	fmt.Printf("  - Recent commits: 0 (handled by real-time action)\n")
 
 	for i, issue := range filteredResult.AssignedIssues {
 		fmt.Printf("    Assigned Issue %d: #%d - %s\n", i+1, issue.Number, issue.Title)
@@ -430,8 +408,8 @@ func runInstantChecks(githubClient *github.Client, discordNotifier *notify.Disco
 			len(filteredResult.AssignedIssues) +
 			len(filteredResult.UnreadNotifications) +
 			len(filteredResult.FailedWorkflows) +
-			len(filteredResult.RepositoryInvitations) +
-			len(filteredResult.RecentCommits)
+			len(filteredResult.RepositoryInvitations)
+			// RecentCommits excluded - handled by real-time action
 
 		fmt.Printf("Sent instant alert with %d NEW items (filtered duplicates & expired invitations)\n", actualItemCount)
 		fmt.Printf("Marked %d keys as sent in cache (including %d marked immediately for race prevention)\n", len(keysToMark), len(keysToMark)-len(remainingKeys))

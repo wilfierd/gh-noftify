@@ -1,14 +1,48 @@
-# Multi-Repository Commit Tracking Setup Guide
+# Real-Time Commit Notifications Setup Guide
 
-This guide explains how to configure your GitHub Notifier to track commits across multiple repositories instead of just the current one.
+⚠️ **DEPRECATED APPROACH**: This documentation describes the old scheduled commit tracking system. 
 
-## 🎯 Overview
+✅ **NEW APPROACH**: We now use real-time GitHub Actions for instant commit notifications!
 
-The enhanced commit tracking feature allows you to:
-- **Track all repositories** in your GitHub account automatically
-- **Select specific repositories** to monitor
-- **Receive real-time notifications** for new commits
-- **Prevent duplicate notifications** with intelligent caching
+## 🚀 New Real-Time System
+
+The new system provides:
+- **Instant notifications** - triggers immediately when you push
+- **Zero configuration** - just add one workflow file per repository
+- **No scheduling needed** - uses GitHub's push event triggers
+- **Better reliability** - no missed commits due to timing
+
+### Quick Setup for Real-Time Notifications:
+
+1. **Use the GitHub Action**: Add this to any repository's `.github/workflows/discord-notify.yml`:
+   ```yaml
+   name: Discord Commit Notifications
+   on:
+     push:
+       branches: [ main, master ]
+   jobs:
+     notify:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: wilfierd/gh-noftify@v1
+           with:
+             discord-webhook: ${{ secrets.DISCORD_WEBHOOK }}
+   ```
+
+2. **Deploy to all repositories**: Use the included script:
+   ```bash
+   ./deploy-to-all-repos.sh
+   ```
+
+3. **Add webhook secret**: Set `DISCORD_WEBHOOK` secret in each repository
+
+For detailed instructions, see `ACTION_USAGE.md`.
+
+---
+
+# ⚠️ Legacy Scheduled System (Deprecated)
+
+The information below describes the old 2-hour scheduled system which has been **removed** in favor of real-time notifications.
 
 ## 🚀 Quick Setup
 
