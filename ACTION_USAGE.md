@@ -28,9 +28,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Discord Notification
-        uses: wilfierd/gh-noftify@v1
+        uses: wilfierd/gh-noftify@v0.1.0
         with:
           discord-webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          sha: ${{ github.sha }}
+          commit-message: ${{ github.event.head_commit.message }}
+          commit-author: ${{ github.event.head_commit.author.name }}
+          repository: ${{ github.repository }}
+          commit-url: ${{ github.event.head_commit.url }}
+          repo-url: ${{ github.event.repository.html_url }}
+          actor: ${{ github.actor }}
+          branch: ${{ github.ref_name }}
 ```
 
 That's it! Every push will now send a notification to your Discord channel.
@@ -50,12 +58,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Discord Notification
-        uses: wilfierd/gh-noftify@v1
+        uses: wilfierd/gh-noftify@v0.1.0
         with:
           discord-webhook: ${{ secrets.DISCORD_WEBHOOK }}
           github-token: ${{ secrets.GITHUB_TOKEN }}  # For avatar support
           include-avatar: 'true'
           notification-title: '🎉 New Code Deployed!'
+          # GitHub context
+          sha: ${{ github.sha }}
+          commit-message: ${{ github.event.head_commit.message }}
+          commit-author: ${{ github.event.head_commit.author.name }}
+          repository: ${{ github.repository }}
+          commit-url: ${{ github.event.head_commit.url }}
+          repo-url: ${{ github.event.repository.html_url }}
+          actor: ${{ github.actor }}
+          branch: ${{ github.ref_name }}
 ```
 
 ### Multiple Webhooks for Different Branches

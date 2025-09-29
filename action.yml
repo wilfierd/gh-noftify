@@ -21,20 +21,53 @@ inputs:
     description: 'Custom title for the notification'
     required: false
     default: '🔔 New Commit Pushed'
+  # GitHub context inputs (passed from workflow)
+  sha:
+    description: 'Git commit SHA'
+    required: false
+    default: ''
+  commit-message:
+    description: 'Commit message'
+    required: false
+    default: ''
+  commit-author:
+    description: 'Commit author name'
+    required: false
+    default: ''
+  repository:
+    description: 'Repository name'
+    required: false
+    default: ''
+  commit-url:
+    description: 'Commit URL'
+    required: false
+    default: ''
+  repo-url:
+    description: 'Repository URL'
+    required: false
+    default: ''
+  actor:
+    description: 'GitHub actor'
+    required: false
+    default: ''
+  branch:
+    description: 'Branch name'
+    required: false
+    default: ''
 
 runs:
   using: 'docker'
   image: 'Dockerfile'
   env:
-    GITHUB_SHA: ${{ github.sha }}
-    COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-    COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-    GITHUB_REPOSITORY: ${{ github.repository }}
-    COMMIT_URL: ${{ github.event.head_commit.url }}
-    REPO_URL: ${{ github.event.repository.html_url }}
+    GITHUB_SHA: ${{ inputs.sha }}
+    COMMIT_MESSAGE: ${{ inputs.commit-message }}
+    COMMIT_AUTHOR: ${{ inputs.commit-author }}
+    GITHUB_REPOSITORY: ${{ inputs.repository }}
+    COMMIT_URL: ${{ inputs.commit-url }}
+    REPO_URL: ${{ inputs.repo-url }}
     DISCORD_WEBHOOK: ${{ inputs.discord-webhook }}
     GH_TOKEN: ${{ inputs.github-token }}
     INCLUDE_AVATAR: ${{ inputs.include-avatar }}
     NOTIFICATION_TITLE: ${{ inputs.notification-title }}
-    GITHUB_ACTOR: ${{ github.actor }}
-    BRANCH_NAME: ${{ github.ref_name }}
+    GITHUB_ACTOR: ${{ inputs.actor }}
+    BRANCH_NAME: ${{ inputs.branch }}
