@@ -21,39 +21,39 @@ inputs:
     description: 'Custom title for the notification'
     required: false
     default: '🔔 New Commit Pushed'
-  # GitHub context inputs (passed from workflow)
+  # GitHub context inputs (auto-populated from GitHub context)
   sha:
     description: 'Git commit SHA'
     required: false
-    default: ''
+    default: ${{ github.sha }}
   commit-message:
     description: 'Commit message'
     required: false
-    default: ''
+    default: ${{ github.event.head_commit.message }}
   commit-author:
     description: 'Commit author name'
     required: false
-    default: ''
+    default: ${{ github.event.head_commit.author.name || github.actor }}
   repository:
     description: 'Repository name'
     required: false
-    default: ''
+    default: ${{ github.repository }}
   commit-url:
     description: 'Commit URL'
     required: false
-    default: ''
+    default: ${{ github.event.head_commit.url }}
   repo-url:
     description: 'Repository URL'
     required: false
-    default: ''
+    default: ${{ github.event.repository.html_url }}
   actor:
     description: 'GitHub actor'
     required: false
-    default: ''
+    default: ${{ github.actor }}
   branch:
     description: 'Branch name'
     required: false
-    default: ''
+    default: ${{ github.ref_name }}
 
 runs:
   using: 'docker'
