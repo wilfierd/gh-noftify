@@ -88,30 +88,6 @@ TRACKED_REPOSITORIES: ''              # Comma-separated repos or empty for all
 - Go 1.22+
 - Git
 
-### Local Development
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/wilfierd/gh-noftify.git
-   cd gh-noftify
-   ```
-
-2. **Install dependencies**
-   ```bash
-   go mod tidy
-   ```
-
-3. **Create environment file**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your actual values
-   ```
-
-4. **Build and run**
-   ```bash
-   go build -o gh-notify main.go
-   ./gh-notify
-   ```
 ## Contributing
 
 🤝 Contributions are welcome! Fork the repository and submit a pull request.
