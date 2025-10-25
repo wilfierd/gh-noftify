@@ -56,18 +56,43 @@ inputs:
     default: ${{ github.ref_name }}
 
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
-  env:
-    GITHUB_SHA: ${{ inputs.sha }}
-    COMMIT_MESSAGE: ${{ inputs.commit-message }}
-    COMMIT_AUTHOR: ${{ inputs.commit-author }}
-    GITHUB_REPOSITORY: ${{ inputs.repository }}
-    COMMIT_URL: ${{ inputs.commit-url }}
-    REPO_URL: ${{ inputs.repo-url }}
-    DISCORD_WEBHOOK: ${{ inputs.discord-webhook }}
-    GH_TOKEN: ${{ inputs.github-token }}
-    INCLUDE_AVATAR: ${{ inputs.include-avatar }}
-    NOTIFICATION_TITLE: ${{ inputs.notification-title }}
-    GITHUB_ACTOR: ${{ inputs.actor }}
-    BRANCH_NAME: ${{ inputs.branch }}
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        cache: true
+        cache-dependency-path: go.sum
+      
+    - name: Download dependencies
+      shell: bash
+      run: go mod download
+    
+    - name: Build commit-notifier
+      shell: bash
+      run: |
+        go build -o commit-notifier ./cmd/commit-notifier
+        chmod +x commit-notifier
+        echo "$(pwd)" >> $GITHUB_PATH
+    
+    - name: Run commit notifier
+      shell: bash
+      env:
+        GITHUB_SHA: ${{ inputs.sha }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        COMMIT_AUTHOR: ${{ inputs.commit-author }}
+        GITHUB_REPOSITORY: ${{ inputs.repository }}
+        COMMIT_URL: ${{ inputs.commit-url }}
+        REPO_URL: ${{ inputs.repo-url }}
+        DISCORD_WEBHOOK: ${{ inputs.discord-webhook }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        INCLUDE_AVATAR: ${{ inputs.include-avatar }}
+        NOTIFICATION_TITLE: ${{ inputs.notification-title }}
+        GITHUB_ACTOR: ${{ inputs.actor }}
+        BRANCH_NAME: ${{ inputs.branch }}
+      run: |
+        ./commit-notifier
