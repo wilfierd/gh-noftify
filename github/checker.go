@@ -1,8 +1,10 @@
 package github
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -39,81 +41,177 @@ func (c *Client) CheckForAlerts(username string) (*CheckResult, error) {
 func (c *Client) CheckForAlertsWithCommits(username string, trackCommits bool, trackedRepos []string, lookbackMinutes int) (*CheckResult, error) {
 	result := &CheckResult{}
 
-	// Get PRs that need review
-	reviewRequests, err := c.GetReviewRequests(username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get review requests: %w", err)
-	}
-	result.PRsNeedingReview = reviewRequests
+	// Create context with timeout for all API calls
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Get user's own PRs that might be stale
-	ownPRs, err := c.GetUserPullRequests(username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user PRs: %w", err)
+	// Note: Context is available for future use if we need to pass it to API calls
+	_ = ctx
+
+	// Use WaitGroup to wait for all goroutines to complete
+	var wg sync.WaitGroup
+	var mu sync.Mutex // Protect shared result struct
+
+	// Channel to collect errors from goroutines
+	errChan := make(chan error, 6) // Buffer for 6 potential errors
+
+	fmt.Println("DEBUG: Starting parallel API calls...")
+	startTime := time.Now()
+
+	// 1. Get PRs that need review
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		reviewRequests, err := c.GetReviewRequests(username)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to get review requests: %w", err)
+			return
+		}
+		mu.Lock()
+		result.PRsNeedingReview = reviewRequests
+		mu.Unlock()
+		fmt.Println("DEBUG: Completed review requests")
+	}()
+
+	// 2. Get user's own PRs that might be stale
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ownPRs, err := c.GetUserPullRequests(username)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to get user PRs: %w", err)
+			return
+		}
+
+		// Filter for stale PRs (older than 2 days, no recent activity)
+		staleDuration := 48 * time.Hour
+		var stalePRs []PullRequest
+		for _, pr := range ownPRs {
+			if time.Since(pr.UpdatedAt) > staleDuration && !pr.Draft {
+				stalePRs = append(stalePRs, pr)
+			}
+		}
+
+		mu.Lock()
+		result.StaleOwnPRs = stalePRs
+		mu.Unlock()
+		fmt.Println("DEBUG: Completed user PRs and stale filtering")
+	}()
+
+	// 3. Get assigned issues
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		assignedIssues, err := c.GetAssignedIssues(username)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to get assigned issues: %w", err)
+			return
+		}
+		mu.Lock()
+		result.AssignedIssues = assignedIssues
+		mu.Unlock()
+		fmt.Println("DEBUG: Completed assigned issues")
+	}()
+
+	// 4. Get unread notifications
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		notifications, err := c.GetNotifications()
+		if err != nil {
+			// Don't fail the whole check if notifications fail due to permissions
+			fmt.Printf("Warning: failed to get notifications: %v\n", err)
+			notifications = []Notification{}
+		}
+
+		var unreadNotifications []Notification
+		for _, notif := range notifications {
+			if notif.Unread {
+				unreadNotifications = append(unreadNotifications, notif)
+			}
+		}
+
+		mu.Lock()
+		result.UnreadNotifications = unreadNotifications
+		mu.Unlock()
+		fmt.Println("DEBUG: Completed notifications")
+	}()
+
+	// 5. Get repository invitations
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		invitations, err := c.GetRepositoryInvitations()
+		if err != nil {
+			// Don't fail the whole check if invitations fail
+			fmt.Printf("Warning: failed to get repository invitations: %v\n", err)
+			invitations = []Invitation{}
+		}
+		mu.Lock()
+		result.RepositoryInvitations = invitations
+		mu.Unlock()
+		fmt.Println("DEBUG: Completed repository invitations")
+	}()
+
+	// 6. Get recent workflow failures
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		failedWorkflows, err := c.GetRecentWorkflowRuns(username)
+		if err != nil {
+			// Don't fail the whole check if workflows fail
+			fmt.Printf("Warning: failed to get workflow runs: %v\n", err)
+			failedWorkflows = []WorkflowRun{}
+		}
+		mu.Lock()
+		result.FailedWorkflows = failedWorkflows
+		mu.Unlock()
+		fmt.Println("DEBUG: Completed workflow runs")
+	}()
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors from goroutines
+	var errors []error
+	for err := range errChan {
+		errors = append(errors, err)
 	}
 
-	// Filter for stale PRs (older than 2 days, no recent activity)
-	staleDuration := 48 * time.Hour
-	for _, pr := range ownPRs {
-		if time.Since(pr.UpdatedAt) > staleDuration && !pr.Draft {
-			result.StaleOwnPRs = append(result.StaleOwnPRs, pr)
+	// If we have critical errors (not warnings), return them
+	if len(errors) > 0 {
+		// Check if any errors are critical (not just warnings)
+		criticalErrors := []error{}
+		for _, err := range errors {
+			// Only treat as critical if it's not a warning message
+			if err != nil {
+				criticalErrors = append(criticalErrors, err)
+			}
+		}
+		if len(criticalErrors) > 0 {
+			return nil, fmt.Errorf("critical errors occurred: %v", criticalErrors)
 		}
 	}
 
-	// Get assigned issues
-	assignedIssues, err := c.GetAssignedIssues(username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get assigned issues: %w", err)
-	}
-	result.AssignedIssues = assignedIssues
-
-	// Get unread notifications
-	notifications, err := c.GetNotifications()
-	if err != nil {
-		// Don't fail the whole check if notifications fail due to permissions
-		fmt.Printf("Warning: failed to get notifications: %v\n", err)
-		// Continue with empty notifications
-		notifications = []Notification{}
-	}
-
-	for _, notif := range notifications {
-		if notif.Unread {
-			result.UnreadNotifications = append(result.UnreadNotifications, notif)
-		}
-	}
-
-	// Get repository invitations
-	invitations, err := c.GetRepositoryInvitations()
-	if err != nil {
-		// Don't fail the whole check if invitations fail
-		fmt.Printf("Warning: failed to get repository invitations: %v\n", err)
-		invitations = []Invitation{}
-	}
-	result.RepositoryInvitations = invitations
-
-	// Get recent workflow failures
-	failedWorkflows, err := c.GetRecentWorkflowRuns(username)
-	if err != nil {
-		// Don't fail the whole check if workflows fail
-		fmt.Printf("Warning: failed to get workflow runs: %v\n", err)
-	}
-	result.FailedWorkflows = failedWorkflows
-
-	// Get recent commits if tracking is enabled
+	// Get recent commits if tracking is enabled (this runs after parallel calls)
 	if trackCommits && lookbackMinutes > 0 {
 		since := time.Now().Add(-time.Duration(lookbackMinutes) * time.Minute)
 		fmt.Printf("DEBUG: Checking for commits since %s (last %d minutes)\n", since.Format(time.RFC3339), lookbackMinutes)
-		
+
 		recentCommits, err := c.GetRecentCommitsFromSelectedRepos(username, since, trackedRepos)
 		if err != nil {
 			// Don't fail the whole check if commit fetching fails
 			fmt.Printf("Warning: failed to get recent commits: %v\n", err)
 			recentCommits = []Commit{}
 		}
-		
+
 		fmt.Printf("DEBUG: Found %d recent commits\n", len(recentCommits))
 		result.RecentCommits = recentCommits
 	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("DEBUG: Parallel API calls completed in %v\n", elapsed)
 
 	return result, nil
 }
