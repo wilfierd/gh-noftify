@@ -232,81 +232,192 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 		IsEvening: isEvening,
 	}
 
+	// Create context with timeout for all API calls
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Note: Context is available for future use if we need to pass it to API calls
+	_ = ctx
+
+	fmt.Printf("DEBUG: Starting parallel daily digest generation (%s)...\n",
+		map[bool]string{true: "evening", false: "morning"}[isEvening])
+	startTime := time.Now()
+
 	if isEvening {
 		// Evening digest: Show what was accomplished today
 		// Get start of today (midnight) instead of last 24 hours
 		startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
-		// Get PRs opened today
-		ownPRs, err := c.GetUserPullRequests(username)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user PRs: %w", err)
-		}
+		// Use WaitGroup for parallel API calls
+		var wg sync.WaitGroup
+		var mu sync.Mutex              // Protect shared digest struct
+		errChan := make(chan error, 3) // Buffer for 3 potential errors
 
-		for _, pr := range ownPRs {
-			if pr.CreatedAt.After(startOfToday) {
-				digest.PRsOpened = append(digest.PRsOpened, pr)
-			}
-			// Check if PR was merged today
-			if pr.State == "closed" && pr.UpdatedAt.After(startOfToday) {
-				digest.PRsMerged = append(digest.PRsMerged, pr)
-			}
-		}
-
-		// Get issues worked on today
-		issues, err := c.GetUserIssues(username)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user issues: %w", err)
-		}
-
-		for _, issue := range issues {
-			if issue.CreatedAt.After(startOfToday) {
-				digest.IssuesOpened = append(digest.IssuesOpened, issue)
-			}
-			if issue.State == "closed" && issue.UpdatedAt.After(startOfToday) {
-				digest.IssuesClosed = append(digest.IssuesClosed, issue)
-			}
-		}
-
-		// Get actual commits from all repositories for today (if enabled)
-		if trackAllCommits {
-			commits, err := c.GetRecentCommitsFromAllRepos(username, startOfToday)
+		// 1. Get PRs opened today
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ownPRs, err := c.GetUserPullRequests(username)
 			if err != nil {
-				fmt.Printf("Warning: failed to get commits from all repos: %v\n", err)
-				digest.CommitsToday = []Commit{} // Empty slice on error
-			} else {
-				digest.CommitsToday = commits
+				errChan <- fmt.Errorf("failed to get user PRs: %w", err)
+				return
 			}
+
+			var prsOpened, prsMerged []PullRequest
+			for _, pr := range ownPRs {
+				if pr.CreatedAt.After(startOfToday) {
+					prsOpened = append(prsOpened, pr)
+				}
+				// Check if PR was merged today
+				if pr.State == "closed" && pr.UpdatedAt.After(startOfToday) {
+					prsMerged = append(prsMerged, pr)
+				}
+			}
+
+			mu.Lock()
+			digest.PRsOpened = prsOpened
+			digest.PRsMerged = prsMerged
+			mu.Unlock()
+			fmt.Println("DEBUG: Completed PRs processing for evening digest")
+		}()
+
+		// 2. Get issues worked on today
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			issues, err := c.GetUserIssues(username)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to get user issues: %w", err)
+				return
+			}
+
+			var issuesOpened, issuesClosed []Issue
+			for _, issue := range issues {
+				if issue.CreatedAt.After(startOfToday) {
+					issuesOpened = append(issuesOpened, issue)
+				}
+				if issue.State == "closed" && issue.UpdatedAt.After(startOfToday) {
+					issuesClosed = append(issuesClosed, issue)
+				}
+			}
+
+			mu.Lock()
+			digest.IssuesOpened = issuesOpened
+			digest.IssuesClosed = issuesClosed
+			mu.Unlock()
+			fmt.Println("DEBUG: Completed issues processing for evening digest")
+		}()
+
+		// 3. Get commits from all repositories for today (if enabled)
+		if trackAllCommits {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				commits, err := c.GetRecentCommitsFromAllRepos(username, startOfToday)
+				if err != nil {
+					fmt.Printf("Warning: failed to get commits from all repos: %v\n", err)
+					commits = []Commit{} // Empty slice on error
+				}
+
+				mu.Lock()
+				digest.CommitsToday = commits
+				mu.Unlock()
+				fmt.Println("DEBUG: Completed commits processing for evening digest")
+			}()
 		} else {
+			mu.Lock()
 			digest.CommitsToday = []Commit{} // Empty if feature disabled
+			mu.Unlock()
+		}
+
+		// Wait for all goroutines to complete
+		wg.Wait()
+		close(errChan)
+
+		// Check for errors from goroutines
+		var errors []error
+		for err := range errChan {
+			errors = append(errors, err)
+		}
+
+		// If we have critical errors, return them
+		if len(errors) > 0 {
+			return nil, fmt.Errorf("critical errors in evening digest: %v", errors)
 		}
 
 	} else {
 		// Morning digest: Show what needs attention today
-		// Get pending review requests
-		reviewRequests, err := c.GetReviewRequests(username)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get review requests: %w", err)
-		}
-		digest.PendingReviews = reviewRequests
+		// Use WaitGroup for parallel API calls
+		var wg sync.WaitGroup
+		var mu sync.Mutex              // Protect shared digest struct
+		errChan := make(chan error, 3) // Buffer for 3 potential errors
 
-		// Get assigned issues
-		assignedIssues, err := c.GetAssignedIssues(username)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get assigned issues: %w", err)
-		}
-		digest.AssignedIssues = assignedIssues
+		// 1. Get pending review requests
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			reviewRequests, err := c.GetReviewRequests(username)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to get review requests: %w", err)
+				return
+			}
 
-		// Get repository invitations for morning digest
-		invitations, err := c.GetRepositoryInvitations()
-		if err != nil {
-			// Don't fail the whole digest if invitations fail
-			fmt.Printf("Warning: failed to get repository invitations for daily digest: %v\n", err)
-			invitations = []Invitation{}
+			mu.Lock()
+			digest.PendingReviews = reviewRequests
+			mu.Unlock()
+			fmt.Println("DEBUG: Completed review requests for morning digest")
+		}()
+
+		// 2. Get assigned issues
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			assignedIssues, err := c.GetAssignedIssues(username)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to get assigned issues: %w", err)
+				return
+			}
+
+			mu.Lock()
+			digest.AssignedIssues = assignedIssues
+			mu.Unlock()
+			fmt.Println("DEBUG: Completed assigned issues for morning digest")
+		}()
+
+		// 3. Get repository invitations for morning digest
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			invitations, err := c.GetRepositoryInvitations()
+			if err != nil {
+				// Don't fail the whole digest if invitations fail
+				fmt.Printf("Warning: failed to get repository invitations for daily digest: %v\n", err)
+				invitations = []Invitation{}
+			}
+
+			mu.Lock()
+			digest.RepositoryInvitations = invitations
+			mu.Unlock()
+			fmt.Println("DEBUG: Completed repository invitations for morning digest")
+		}()
+
+		// Wait for the main API calls to complete
+		wg.Wait()
+		close(errChan)
+
+		// Check for errors from goroutines
+		var errors []error
+		for err := range errChan {
+			errors = append(errors, err)
 		}
-		digest.RepositoryInvitations = invitations
+
+		// If we have critical errors, return them
+		if len(errors) > 0 {
+			return nil, fmt.Errorf("critical errors in morning digest: %v", errors)
+		}
 
 		// Get recent commits for context (previous day for morning digest, if enabled)
+		// This runs after the main parallel calls since it's optional
 		if trackAllCommits {
 			oneDaysAgo := now.AddDate(0, 0, -1)
 			commits, err := c.GetRecentCommitsFromAllRepos(username, oneDaysAgo)
@@ -320,6 +431,9 @@ func (c *Client) GenerateDailyDigest(username string, trackAllCommits bool) (*Da
 			digest.CommitsToday = []Commit{} // Empty if feature disabled
 		}
 	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("DEBUG: Parallel daily digest generation completed in %v\n", elapsed)
 
 	return digest, nil
 }
