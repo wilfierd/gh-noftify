@@ -81,13 +81,6 @@ COMMIT_LOOKBACK_MINUTES: '120'        # How far back to check for commits
 TRACKED_REPOSITORIES: ''              # Comma-separated repos or empty for all
 ```
 
-## Development
-
-### Prerequisites
-
-- Go 1.22+
-- Git
-
 ## Contributing
 
 🤝 Contributions are welcome! Fork the repository and submit a pull request.
