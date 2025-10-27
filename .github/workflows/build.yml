@@ -2,80 +2,57 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main ]
-  release:
-    types: [ published ]
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-            ext: ""
-          - os: linux
-            arch: arm64
-            ext: ""
-          - os: windows
-            arch: amd64
-            ext: ".exe"
-          - os: darwin
-            arch: amd64
-            ext: ""
-          - os: darwin
-            arch: arm64
-            ext: ""
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+    
+    - name: Build Linux binary for action
+      run: |
+        mkdir -p bin
+        GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+          -ldflags="-w -s" \
+          -o bin/commit-notifier \
+          ./cmd/commit-notifier
+        chmod +x bin/commit-notifier
+    
+    - name: Commit binary to tag
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add bin/commit-notifier
+        git commit -m "chore: add pre-built binary for release" || echo "No changes to commit"
+        git tag -f ${{ github.ref_name }}
+        git push -f origin ${{ github.ref_name }}
 
+  test-build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
     steps:
     - uses: actions/checkout@v4
     
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: '1.22'
     
-    - name: Build commit-notifier binary
+    - name: Test build
       run: |
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
-          -ldflags="-w -s" \
-          -o commit-notifier${{ matrix.ext }} \
-          ./cmd/commit-notifier
-    
-    - name: Upload binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: commit-notifier-${{ matrix.os }}-${{ matrix.arch }}
-        path: commit-notifier${{ matrix.ext }}
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-    
-    - name: Create release assets
-      run: |
-        mkdir -p release
-        for dir in commit-notifier-*; do
-          if [ -d "$dir" ]; then
-            cp "$dir"/* release/
-          fi
-        done
-    
-    - name: Upload release assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./release/
-        asset_name: binaries.zip
-        asset_content_type: application/zip
+        go mod download
+        go build -v ./cmd/commit-notifier
