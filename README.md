@@ -67,20 +67,6 @@ Go to the `Actions` tab → `GitHub Notifier` → `Run workflow` and choose a ch
 - **`commit`** – Send commit notification (on push)
 - **`all`** – Run all notification types (instant, morning, evening, commit)
 
-## Configuration
-
-The workflow uses these environment variables:
-
-```yaml
-CHECK_TYPE: 'instant' | 'morning' | 'evening' | 'commit' | 'all'  # Notification type
-CHECK_INTERVAL: '5m'                  # Time between instant checks
-DAILY_REPORT_TIME: '07:00'            # Morning report time (Vietnam timezone) 
-TIMEZONE: 'Asia/Ho_Chi_Minh'          # Timezone for reports
-TRACK_COMMITS_REALTIME: 'false'       # Enable real-time commit notifications
-COMMIT_LOOKBACK_MINUTES: '120'        # How far back to check for commits
-TRACKED_REPOSITORIES: ''              # Comma-separated repos or empty for all
-```
-
 ## Contributing
 
 🤝 Contributions are welcome! Fork the repository and submit a pull request.
