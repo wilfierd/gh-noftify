@@ -168,7 +168,7 @@ func FormatInstantAlert(result *github.CheckResult, username string, avatarURL s
 
 func FormatDailyDigest(digest *github.DailyDigest, username string, avatarURL string) (*DiscordMessage, error) {
 	var fields []Field
-	dateStr := digest.Date.Format("2006-01-02")
+	dateStr := digest.Date.Format("02-01-2006")
 
 	var title, description string
 	var color int

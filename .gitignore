@@ -15,6 +15,7 @@
 go.work
 
 # IDE files
+.kiro
 .vscode/
 .idea/
 *.swp
